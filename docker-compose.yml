@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: booru
+      POSTGRES_PASSWORD: booru
+      POSTGRES_DB: booru
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  app:
+    build: .
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://booru:booru@db:5432/booru
+      STORAGE_PATH: /app/storage
+    volumes:
+      - .:/app
+      - ./storage:/app/storage
+      - ./static:/app/static
+      - ./backups:/app/backups
+    depends_on:
+      - db
+
+  backup:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: booru
+      POSTGRES_PASSWORD: booru
+      POSTGRES_DB: booru
+      PGPASSWORD: booru
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      - db
+    entrypoint: >
+      sh -c "
+        mkdir -p /backups/auto /backups/manual &&
+        while true; do
+          sleep 86400 &&
+          FILENAME=/backups/auto/backup_$$(date +%Y%m%d_%H%M%S).sql &&
+          pg_dump -h db -U booru booru > $$FILENAME &&
+          echo \"[backup] saved $$FILENAME\" &&
+          ls -t /backups/auto/backup_*.sql | tail -n +8 | xargs -r rm --
+        done
+      "
+
+volumes:
+  postgres_data:

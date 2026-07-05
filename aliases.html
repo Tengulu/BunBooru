@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bunbooru — aliases</title>
+<style>
+  :root {
+    --pink: #ea005e;
+    --dark: #4e001f;
+    --light: #d5eafb;
+    --bg: #080814;
+    --surface: #0d0d20;
+    --surface2: #13132a;
+    --surface3: #1a1a35;
+    --border: rgba(234,0,94,0.2);
+    --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+  #aliases-wrap { max-width: 900px; margin: 30px auto; padding: 0 24px; }
+  #aliases-layout { display: flex; gap: 24px; align-items: flex-start; }
+  #aliases-sidebar { width: 180px; min-width: 180px; display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+  #aliases-main { flex: 1; min-width: 0; }
+  h2 { font-size: 15px; font-weight: 500; margin-bottom: 16px; color: var(--pink); font-family: var(--mono); }
+  .alias-form { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .alias-form input { flex: 1; min-width: 120px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 7px 10px; color: var(--text); font-family: var(--mono); font-size: 12px; outline: none; }
+  .alias-form input:focus { border-color: var(--pink); }
+  .alias-arrow { color: var(--pink); font-family: var(--mono); }
+  .alias-form button { background: var(--pink); color: white; border: none; border-radius: 4px; padding: 7px 14px; font-size: 12px; cursor: pointer; }
+  #alias-list { display: flex; flex-direction: column; gap: 6px; }
+  .alias-row { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 7px 12px; font-family: var(--mono); font-size: 12px; }
+  .alias-del { color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
+  .alias-del:hover { color: var(--pink); }
+  .ac-wrap { position: relative; flex: 1; min-width: 120px; }
+  .ac-wrap input { width: 100%; }
+  .ac-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface3, #1a1a35); border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px; max-height: 160px; overflow-y: auto; z-index: 100; display: none; }
+  .ac-item { padding: 5px 10px; cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--text); display: flex; justify-content: space-between; }
+  .ac-item:hover, .ac-item.selected { background: rgba(234,0,94,0.12); }
+  .ac-item .ac-cat { color: var(--muted); font-size: 10px; }
+  .cat-general { color: var(--text); }
+  .cat-creator { color: #c261ff; }
+  .cat-character { color: #4e9aff; }
+  .cat-copyright { color: #ff9f43; }
+  .cat-meta { color: #888; }
+</style>
+</head>
+<body>
+<div id="topbar-mount"></div>
+<div id="aliases-wrap">
+  <h2>tag aliases</h2>
+  <div id="aliases-layout">
+    <div id="aliases-sidebar">
+      <button onclick="applyAliases()" style="background:var(--pink);color:white;border:none;border-radius:4px;padding:8px 12px;font-size:11px;font-family:var(--mono);cursor:pointer;width:100%;text-align:left">apply to all posts</button>
+      <span id="apply-status" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
+      <a href="/bogus" style="font-size:11px;font-family:var(--mono);color:var(--muted);text-decoration:none" onmouseover="this.style.color='var(--pink)'" onmouseout="this.style.color='var(--muted)'">→ bogus tags</a>
+    </div>
+    <div id="aliases-main">
+      <div class="alias-form">
+        <div class="ac-wrap">
+          <input id="alias-from" type="text" placeholder="alias (e.g. blonde hair)" autocomplete="off" spellcheck="false" />
+          <div id="alias-from-ac" class="ac-dropdown"></div>
+        </div>
+        <span class="alias-arrow">→</span>
+        <div class="ac-wrap">
+          <input id="alias-to" type="text" placeholder="canonical — use cr: ch: co: m: to set category" autocomplete="off" spellcheck="false" />
+          <div id="alias-ac" class="ac-dropdown"></div>
+        </div>
+        <button onclick="createAlias()">add</button>
+      </div>
+      <div id="alias-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+fetch('/topbar').then(r => r.text()).then(html => {
+  document.getElementById('topbar-mount').innerHTML = html;
+  document.querySelectorAll('#topbar-mount script').forEach(s => { const ns = document.createElement('script'); ns.textContent = s.textContent; document.body.appendChild(ns); });
+});
+
+// ── Autocomplete for canonical field ─────────────────────────────────────────
+let acItems = [], acIndex = -1;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('alias-to');
+  const dropdown = document.getElementById('alias-ac');
+
+  // autocomplete for alias-from field
+  const fromInput = document.getElementById('alias-from');
+  const fromDropdown = document.getElementById('alias-from-ac');
+  let fromAcItems = [], fromAcIndex = -1;
+
+  fromInput.addEventListener('input', async () => {
+    const val = fromInput.value.trim();
+    if (!val) { fromDropdown.style.display = 'none'; return; }
+    const [results, aliases] = await Promise.all([
+      fetch(`/tags?search=${encodeURIComponent(val)}&limit=20`).then(r => r.json()).catch(() => []),
+      fetch('/api/aliases').then(r => r.json()).catch(() => [])
+    ]);
+    const aliasedNames = new Set(aliases.map(a => a.alias));
+    const filtered = results.filter(t => !aliasedNames.has(t.name));
+    fromAcItems = filtered;
+    fromAcIndex = -1;
+    renderFromAC(filtered);
+  });
+
+  fromInput.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); fromAcIndex = Math.min(fromAcIndex + 1, fromAcItems.length - 1); renderFromAC(fromAcItems); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); fromAcIndex = Math.max(fromAcIndex - 1, -1); renderFromAC(fromAcItems); }
+    else if (e.key === 'Enter' && fromAcIndex >= 0) { e.preventDefault(); selectFromAC(fromAcIndex); }
+    else if (e.key === 'Escape') { fromDropdown.style.display = 'none'; }
+  });
+
+  function renderFromAC(items) {
+    fromDropdown.innerHTML = '';
+    if (!items.length) { fromDropdown.style.display = 'none'; return; }
+    items.forEach((item, i) => {
+      const el = document.createElement('div');
+      el.className = 'ac-item' + (i === fromAcIndex ? ' selected' : '');
+      el.innerHTML = `<span>${item.name}</span><span class="ac-cat">${item.category} · ${item.post_count}</span>`;
+      el.addEventListener('mousedown', e => { e.preventDefault(); selectFromAC(i); });
+      fromDropdown.appendChild(el);
+    });
+    fromDropdown.style.display = 'block';
+  }
+
+  function selectFromAC(i) {
+    if (fromAcItems[i]) { fromInput.value = fromAcItems[i].name; fromDropdown.style.display = 'none'; fromAcItems = []; fromAcIndex = -1; }
+  }
+
+  // autocomplete for alias-to field
+  input.addEventListener('input', async () => {
+    const val = input.value.trim();
+    if (!val) { dropdown.style.display = 'none'; return; }
+    const results = await fetch(`/tags?search=${encodeURIComponent(val)}&limit=10`).then(r => r.json()).catch(() => []);
+    acItems = results;
+    acIndex = -1;
+    renderAC(results, dropdown, input);
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); acIndex = Math.min(acIndex + 1, acItems.length - 1); renderAC(acItems, dropdown, input); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); acIndex = Math.max(acIndex - 1, -1); renderAC(acItems, dropdown, input); }
+    else if (e.key === 'Enter' && acIndex >= 0) { e.preventDefault(); selectAC(acIndex, input, dropdown); }
+    else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
+  });
+
+  document.addEventListener('click', e => { if (!e.target.closest('.ac-wrap')) { dropdown.style.display = 'none'; fromDropdown.style.display = 'none'; } });
+});
+
+function renderAC(items, dropdown, input) {
+  dropdown.innerHTML = '';
+  if (!items.length) { dropdown.style.display = 'none'; return; }
+  items.forEach((item, i) => {
+    const el = document.createElement('div');
+    el.className = 'ac-item' + (i === acIndex ? ' selected' : '');
+    el.innerHTML = `<span>${item.name}</span><span class="ac-cat">${item.category} · ${item.post_count}</span>`;
+    el.addEventListener('mousedown', e => { e.preventDefault(); selectAC(i, input, dropdown); });
+    dropdown.appendChild(el);
+  });
+  dropdown.style.display = 'block';
+}
+
+function selectAC(i, input, dropdown) {
+  if (acItems[i]) { input.value = acItems[i].name; dropdown.style.display = 'none'; acItems = []; acIndex = -1; }
+}
+
+async function loadAliases() {
+  const list = document.getElementById('alias-list');
+  list.innerHTML = '<span style="color:var(--muted);font-size:12px;font-family:var(--mono)">loading...</span>';
+  const aliases = await fetch('/api/aliases').then(r => r.json()).catch(() => []);
+  list.innerHTML = '';
+  if (!aliases.length) { list.innerHTML = '<span style="color:var(--muted);font-size:12px;font-family:var(--mono)">no aliases yet</span>'; return; }
+  [...aliases].reverse().forEach(a => {
+    const row = document.createElement('div');
+    row.className = 'alias-row';
+    const aliasCat = a.alias_category || 'general';
+    const canonCat = a.canonical_category || 'general';
+    row.innerHTML = `<span class="cat-${aliasCat}">${a.alias}</span><span style="color:var(--pink);margin:0 10px">→</span><span class="cat-${canonCat}">${a.canonical}</span><span class="alias-del" onclick="deleteAlias('${a.alias}')">×</span>`;
+    list.appendChild(row);
+  });
+}
+
+async function createAlias() {
+  const alias = document.getElementById('alias-from').value.trim();
+  const canonical = document.getElementById('alias-to').value.trim();
+  if (!alias || !canonical) return;
+  await fetch(`/api/aliases?alias=${encodeURIComponent(alias)}&canonical=${encodeURIComponent(canonical)}`, { method: 'POST' });
+  document.getElementById('alias-from').value = '';
+  document.getElementById('alias-to').value = '';
+  loadAliases();
+}
+
+async function applyAliases() {
+  const status = document.getElementById('apply-status');
+  status.textContent = 'applying...';
+  status.style.color = 'var(--muted)';
+  try {
+    const res = await fetch('/api/aliases/apply', { method: 'POST' }).then(r => r.json());
+    status.textContent = `done — ${res.updated_tags} tags updated across ${res.updated_posts} posts`;
+    status.style.color = '#4ec97a';
+    loadAliases();
+  } catch(e) {
+    status.textContent = 'error applying aliases';
+    status.style.color = 'var(--pink)';
+  }
+}
+
+async function deleteAlias(alias) {
+  await fetch(`/api/aliases/${encodeURIComponent(alias)}`, { method: 'DELETE' });
+  loadAliases();
+}
+
+loadAliases();
+</script>
+</body>
+</html>

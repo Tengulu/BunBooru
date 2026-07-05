@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bunbooru — upload</title>
+<style>
+  :root {
+    --pink: #ea005e;
+    --dark: #4e001f;
+    --light: #d5eafb;
+    --bg: #080814;
+    --surface: #0d0d20;
+    --surface2: #13132a;
+    --surface3: #1a1a35;
+    --border: rgba(234,0,94,0.2);
+    --border-hover: rgba(234,0,94,0.6);
+    --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+  a { color: inherit; text-decoration: none; }
+  .upload-wrap { max-width: 520px; margin: 40px auto 24px; padding: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  h2 { font-size: 15px; font-weight: 500; margin-bottom: 16px; color: var(--pink); font-family: var(--mono); }
+  .field { margin-bottom: 12px; }
+  label { display: block; font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 4px; }
+  input[type=file] { color: var(--text); font-size: 13px; width: 100%; }
+  input[type=text] { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; color: var(--text); font-family: var(--mono); font-size: 12px; outline: none; }
+  input[type=text]:focus { border-color: var(--pink); }
+  button { background: var(--pink); color: white; border: none; border-radius: 4px; padding: 9px 20px; font-size: 13px; cursor: pointer; margin-top: 4px; }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .status { font-size: 12px; font-family: var(--mono); margin-top: 10px; min-height: 18px; }
+  .status.ok { color: #4ec97a; }
+  .status.err { color: var(--pink); }
+  .tag-preview { margin-top: 8px; font-size: 11px; font-family: var(--mono); color: var(--muted); min-height: 16px; }
+  .tag-preview span { color: var(--text); }
+  .progress-bar-wrap { margin-top: 10px; background: var(--surface2); border-radius: 4px; height: 6px; display: none; }
+  .progress-bar { height: 6px; background: var(--pink); border-radius: 4px; width: 0%; transition: width 0.2s; }
+  #log { margin-top: 12px; font-size: 11px; font-family: var(--mono); color: var(--muted); max-height: 200px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 8px; display: none; }
+  #log div { padding: 2px 0; }
+  #log .log-ok { color: #4ec97a; }
+  #log .log-dup { color: #ffaa00; }
+  #log .log-err { color: var(--pink); }
+
+  /* Drop zone */
+  #drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 32px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    position: relative;
+  }
+  #drop-zone:hover, #drop-zone.drag-over {
+    border-color: var(--pink);
+    background: rgba(234,0,94,0.05);
+    color: var(--text);
+  }
+  #drop-zone .drop-icon { font-size: 28px; margin-bottom: 8px; }
+  #drop-zone .drop-hint { font-size: 10px; color: var(--muted); margin-top: 6px; }
+  .divider { display: flex; align-items: center; gap: 10px; margin: 14px 0; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .file-btns { display: flex; gap: 8px; }
+  .file-btn-wrap { flex: 1; }
+  .file-btn-label { display: block; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; font-family: var(--mono); font-size: 11px; color: var(--muted); cursor: pointer; text-align: center; transition: all 0.15s; }
+  .file-btn-label:hover { border-color: var(--pink); color: var(--pink); }
+</style>
+</head>
+<body>
+<div id="topbar-mount"></div>
+
+<!-- Single file upload -->
+<div class="upload-wrap">
+  <h2>upload post</h2>
+  <div class="field">
+    <label>file</label>
+    <input type="file" id="upload-file" accept="image/*,video/*" />
+  </div>
+  <div class="field">
+    <label>tags (space separated, use prefixes: cr: ch: co: m:)</label>
+    <input type="text" id="upload-tags" placeholder="tag1 cr:artist ch:character" />
+  </div>
+  <button onclick="doUpload()">upload</button>
+  <div id="single-status" class="status"></div>
+</div>
+
+<!-- Folder / archive upload -->
+<div class="upload-wrap">
+  <h2>upload folder or archive</h2>
+  <p style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:14px">tags are read from the folder or archive name — use cr~ ch~ co~ m~ instead of :</p>
+
+  <div id="drop-zone" onclick="document.getElementById('hidden-file').click()">
+    <div class="drop-icon">⬇</div>
+    <div>drop a folder or archive here</div>
+    <div class="drop-hint">or click to browse · supports .zip .7z .rar and folders</div>
+  </div>
+
+  <div class="divider">or pick manually</div>
+
+  <div class="file-btns">
+    <div class="file-btn-wrap">
+      <label class="file-btn-label" for="folder-input">📁 choose folder</label>
+      <input type="file" id="folder-input" webkitdirectory multiple accept="image/*,video/*" style="display:none" onchange="onFolderSelected(this.files)" />
+    </div>
+    <div class="file-btn-wrap">
+      <label class="file-btn-label" for="archive-input">🗜 choose archive</label>
+      <input type="file" id="archive-input" accept=".zip,.7z,.rar" style="display:none" onchange="onArchiveSelected(this.files)" />
+    </div>
+  </div>
+
+  <!-- hidden input for drop zone click -->
+  <input type="file" id="hidden-file" style="display:none" />
+
+  <div class="tag-preview" id="bulk-tag-preview"></div>
+  <div class="progress-bar-wrap" id="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+  <button id="bulk-btn" onclick="doBulkUpload()" disabled style="margin-top:12px">upload</button>
+  <div id="bulk-status" class="status"></div>
+  <div id="log"></div>
+</div>
+
+<script>
+fetch('/topbar').then(r => r.text()).then(html => {
+  document.getElementById('topbar-mount').innerHTML = html;
+  document.querySelectorAll('#topbar-mount script').forEach(s => { const ns = document.createElement('script'); ns.textContent = s.textContent; document.body.appendChild(ns); });
+});
+
+const MEDIA_TYPES = new Set(['image/jpeg','image/png','image/gif','image/webp','image/bmp','image/tiff','image/avif','image/x-icon','video/mp4','video/webm','video/quicktime','video/x-matroska','video/x-msvideo','video/x-flv','video/x-ms-wmv','video/x-m4v','video/3gpp','video/mp2t']);
+const ARCHIVE_EXTS = new Set(['.zip','.7z','.rar']);
+
+let bulkMode = null; // 'folder' or 'archive'
+let bulkFiles = null; // FileList for folder, File for archive
+let bulkTags = '';
+
+function convertTilde(name) {
+  return name.replace(/\b(cr|ch|co|m)~/g, '$1:');
+}
+
+function setPreview(tags, count) {
+  const preview = document.getElementById('bulk-tag-preview');
+  const btn = document.getElementById('bulk-btn');
+  if (!tags && !count) { preview.innerHTML = ''; btn.disabled = true; return; }
+  preview.innerHTML = (count ? `<span>${count}</span> files &nbsp;·&nbsp; ` : '') + `tags: <span>${tags || 'TAG_ME!'}</span>`;
+  btn.disabled = false;
+}
+
+// ── Folder ────────────────────────────────────────────────────────────────────
+function onFolderSelected(files) {
+  const mediaFiles = [...files].filter(f => MEDIA_TYPES.has(f.type));
+  if (!mediaFiles.length) return;
+  // build per-file tag list from full path — root folder + all subfolder names
+  const taggedFiles = mediaFiles.map(f => {
+    const parts = f.webkitRelativePath.split('/');
+    // parts[0] = root folder, parts[1..n-1] = subfolders, parts[n] = filename
+    const tagParts = parts.slice(0, -1).map(convertTilde);
+    return { file: f, tags: tagParts.join(' ').trim() };
+  });
+  const rootTags = convertTilde(mediaFiles[0].webkitRelativePath.split('/')[0]);
+  bulkMode = 'folder';
+  bulkFiles = taggedFiles;
+  bulkTags = rootTags;
+  setPreview(rootTags + ' (+ subfolders)', taggedFiles.length);
+}
+
+// ── Archive ───────────────────────────────────────────────────────────────────
+function onArchiveSelected(files) {
+  if (!files.length) return;
+  const file = files[0];
+  const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+  if (!ARCHIVE_EXTS.has(ext)) return;
+  bulkMode = 'archive';
+  bulkFiles = file;
+  bulkTags = convertTilde(file.name.replace(/\.[^.]+$/, ''));
+  setPreview(bulkTags, null);
+}
+
+// ── Drop zone ─────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', async e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+
+  const items = [...e.dataTransfer.items];
+  const files = [...e.dataTransfer.files];
+
+  // Check if it's a folder drop
+  if (items.length && items[0].webkitGetAsEntry) {
+    const entry = items[0].webkitGetAsEntry();
+    if (entry && entry.isDirectory) {
+      const taggedFiles = [];
+      await readDirRecursive(entry, convertTilde(entry.name), taggedFiles);
+      if (!taggedFiles.length) return;
+      bulkMode = 'folder';
+      bulkFiles = taggedFiles;
+      bulkTags = convertTilde(entry.name);
+      setPreview(bulkTags + ' (+ subfolders)', taggedFiles.length);
+      return;
+    }
+  }
+
+  // Archive drop
+  if (files.length === 1) {
+    const file = files[0];
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (ARCHIVE_EXTS.has(ext)) {
+      onArchiveSelected(files);
+      return;
+    }
+  }
+});
+
+async function readDirRecursive(dirEntry, parentTags, result) {
+  return new Promise(resolve => {
+    const reader = dirEntry.createReader();
+    reader.readEntries(async entries => {
+      for (const entry of entries) {
+        if (entry.isFile) {
+          await new Promise(r => entry.file(file => {
+            if (MEDIA_TYPES.has(file.type)) result.push({ file, tags: parentTags || '' });
+            r();
+          }));
+        } else if (entry.isDirectory) {
+          const subTags = (parentTags ? parentTags + ' ' : '') + convertTilde(entry.name);
+          await readDirRecursive(entry, subTags.trim(), result);
+        }
+      }
+      resolve();
+    });
+  });
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+async function doBulkUpload() {
+  const status = document.getElementById('bulk-status');
+  const log = document.getElementById('log');
+  const btn = document.getElementById('bulk-btn');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progressBar = document.getElementById('progress-bar');
+
+  btn.disabled = true;
+  log.innerHTML = '';
+  log.style.display = 'none';
+
+  if (bulkMode === 'archive') {
+    status.textContent = 'uploading and extracting...'; status.className = 'status';
+    const fd = new FormData();
+    fd.append('file', bulkFiles);
+    try {
+      const res = await fetch('/upload/archive', { method: 'POST', body: fd });
+      if (!res.ok) { const e = await res.json(); status.textContent = e.detail || 'failed'; status.className = 'status err'; btn.disabled = false; return; }
+      const data = await res.json();
+      status.textContent = `done — ${data.created} created, ${data.duplicates} duplicates, ${data.errors} errors, ${data.skipped} skipped`;
+      status.className = 'status ok';
+    } catch(e) { status.textContent = 'connection error'; status.className = 'status err'; }
+    btn.disabled = false;
+    return;
+  }
+
+  if (bulkMode === 'folder') {
+    const files = bulkFiles;
+    log.style.display = 'block';
+    progressWrap.style.display = 'block';
+    let created = 0, dupes = 0, errors = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const item = files[i];
+      const file = item.file || item;
+      const tags = item.tags || bulkTags;
+      status.textContent = `uploading ${i + 1} / ${files.length}...`; status.className = 'status';
+      progressBar.style.width = `${((i + 1) / files.length) * 100}%`;
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('tags', tags);
+        const res = await fetch('/posts', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.status === 'created') { created++; addLog(`✓ ${file.name} (${tags}) → #${data.id}`, 'log-ok'); }
+        else if (data.status === 'duplicate') { dupes++; addLog(`— ${file.name} (duplicate)`, 'log-dup'); }
+        else { errors++; addLog(`✗ ${file.name} (failed)`, 'log-err'); }
+      } catch(e) { errors++; addLog(`✗ ${file.name} (error)`, 'log-err'); }
+    }
+
+    status.textContent = `done — ${created} created, ${dupes} duplicates, ${errors} errors`;
+    status.className = errors ? 'status err' : 'status ok';
+    btn.disabled = false;
+  }
+}
+
+function addLog(msg, cls) {
+  const log = document.getElementById('log');
+  const d = document.createElement('div');
+  d.className = cls; d.textContent = msg;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ── Single file upload ────────────────────────────────────────────────────────
+async function doUpload() {
+  const fileInput = document.getElementById('upload-file');
+  const tags = document.getElementById('upload-tags').value.trim();
+  const status = document.getElementById('single-status');
+  if (!fileInput.files.length) { status.textContent = 'select a file first'; status.className = 'status err'; return; }
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('tags', tags || '');
+  status.textContent = 'uploading...'; status.className = 'status';
+  try {
+    const res = await fetch('/posts', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.status === 'created') { status.textContent = `uploaded as post #${data.id}`; status.className = 'status ok'; }
+    else if (data.status === 'duplicate') { status.textContent = 'duplicate — already in booru'; status.className = 'status err'; }
+    else { status.textContent = 'upload failed'; status.className = 'status err'; }
+  } catch(e) { status.textContent = 'connection error'; status.className = 'status err'; }
+}
+</script>
+</body>
+</html>

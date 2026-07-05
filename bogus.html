@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bunbooru — bogus tags</title>
+<style>
+  :root {
+    --pink: #ea005e;
+    --dark: #4e001f;
+    --light: #d5eafb;
+    --bg: #080814;
+    --surface: #0d0d20;
+    --surface2: #13132a;
+    --surface3: #1a1a35;
+    --border: rgba(234,0,94,0.2);
+    --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+  #wrap { max-width: 900px; margin: 30px auto; padding: 0 24px; }
+  #bogus-layout { display: flex; gap: 24px; align-items: flex-start; }
+  #bogus-sidebar { width: 180px; min-width: 180px; display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+  #bogus-main { flex: 1; min-width: 0; }
+  h2 { font-size: 15px; font-weight: 500; margin-bottom: 4px; color: var(--pink); font-family: var(--mono); }
+  .subtitle { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 16px; }
+  .form { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+  .ac-wrap { position: relative; flex: 1; }
+  .ac-wrap input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 7px 10px; color: var(--text); font-family: var(--mono); font-size: 12px; outline: none; }
+  .ac-wrap input:focus { border-color: var(--pink); }
+  .ac-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface3); border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px; max-height: 160px; overflow-y: auto; z-index: 100; display: none; }
+  .ac-item { padding: 5px 10px; cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--text); display: flex; justify-content: space-between; }
+  .ac-item:hover, .ac-item.selected { background: rgba(234,0,94,0.12); }
+  .ac-item .ac-cat { color: var(--muted); font-size: 10px; }
+  .form button { background: var(--pink); color: white; border: none; border-radius: 4px; padding: 7px 14px; font-size: 12px; cursor: pointer; }
+  #bogus-list { display: flex; flex-direction: column; gap: 6px; }
+  .bogus-row { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 7px 12px; font-family: var(--mono); font-size: 12px; }
+  .bogus-del { color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
+  .bogus-del:hover { color: var(--pink); }
+  .actions { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .nav-link { font-size: 11px; font-family: var(--mono); color: var(--muted); text-decoration: none; }
+  .nav-link:hover { color: var(--pink); }
+</style>
+</head>
+<body>
+<div id="topbar-mount"></div>
+<div id="wrap">
+  <h2>bogus tags</h2>
+  <p class="subtitle">tags in this list are automatically stripped from all incoming posts and can be removed from existing posts below</p>
+
+  <div id="bogus-layout">
+    <div id="bogus-sidebar">
+      <button onclick="applyBogus()" style="background:var(--pink);color:white;border:none;border-radius:4px;padding:8px 12px;font-size:11px;font-family:var(--mono);cursor:pointer;width:100%;text-align:left">remove from all posts</button>
+      <span id="apply-status" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
+      <a class="nav-link" href="/aliases">← back to aliases</a>
+    </div>
+    <div id="bogus-main">
+      <div class="form">
+        <div class="ac-wrap">
+          <input id="bogus-input" type="text" placeholder="tag to mark as bogus" autocomplete="off" spellcheck="false" />
+          <div id="bogus-ac" class="ac-dropdown"></div>
+        </div>
+        <button onclick="createBogus()">add</button>
+      </div>
+      <div id="bogus-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+fetch('/topbar').then(r => r.text()).then(html => {
+  document.getElementById('topbar-mount').innerHTML = html;
+  document.querySelectorAll('#topbar-mount script').forEach(s => { const ns = document.createElement('script'); ns.textContent = s.textContent; document.body.appendChild(ns); });
+});
+
+// ── Autocomplete ──────────────────────────────────────────────────────────────
+let acItems = [], acIndex = -1;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('bogus-input');
+  const dropdown = document.getElementById('bogus-ac');
+
+  input.addEventListener('input', async () => {
+    const val = input.value.trim();
+    if (!val) { dropdown.style.display = 'none'; return; }
+    const [results, aliases] = await Promise.all([
+      fetch(`/tags?search=${encodeURIComponent(val)}&limit=20`).then(r => r.json()).catch(() => []),
+      fetch('/api/aliases').then(r => r.json()).catch(() => [])
+    ]);
+    const aliasNames = new Set([...aliases.map(a => a.alias), ...aliases.map(a => a.canonical)]);
+    const filtered = results.filter(t => !aliasNames.has(t.name));
+    acItems = filtered;
+    acIndex = -1;
+    renderAC(filtered);
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); acIndex = Math.min(acIndex + 1, acItems.length - 1); renderAC(acItems); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); acIndex = Math.max(acIndex - 1, -1); renderAC(acItems); }
+    else if (e.key === 'Enter') { if (acIndex >= 0) { e.preventDefault(); selectAC(acIndex); } else { createBogus(); } }
+    else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
+  });
+
+  document.addEventListener('click', e => { if (!e.target.closest('.ac-wrap')) dropdown.style.display = 'none'; });
+});
+
+function renderAC(items) {
+  const dropdown = document.getElementById('bogus-ac');
+  dropdown.innerHTML = '';
+  if (!items.length) { dropdown.style.display = 'none'; return; }
+  items.forEach((item, i) => {
+    const el = document.createElement('div');
+    el.className = 'ac-item' + (i === acIndex ? ' selected' : '');
+    el.innerHTML = `<span>${item.name}</span><span class="ac-cat">${item.category} · ${item.post_count}</span>`;
+    el.addEventListener('mousedown', e => { e.preventDefault(); selectAC(i); });
+    dropdown.appendChild(el);
+  });
+  dropdown.style.display = 'block';
+}
+
+function selectAC(i) {
+  const input = document.getElementById('bogus-input');
+  const dropdown = document.getElementById('bogus-ac');
+  if (acItems[i]) { input.value = acItems[i].name; dropdown.style.display = 'none'; acItems = []; acIndex = -1; }
+}
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
+async function loadBogus() {
+  const list = document.getElementById('bogus-list');
+  list.innerHTML = '<span style="color:var(--muted);font-size:12px;font-family:var(--mono)">loading...</span>';
+  const items = await fetch('/api/bogus').then(r => r.json()).catch(() => []);
+  list.innerHTML = '';
+  if (!items.length) { list.innerHTML = '<span style="color:var(--muted);font-size:12px;font-family:var(--mono)">no bogus tags yet</span>'; return; }
+  items.forEach(b => {
+    const row = document.createElement('div');
+    row.className = 'bogus-row';
+    row.innerHTML = `<span>${b.name}</span><span class="bogus-del" onclick="deleteBogus('${b.name}')">×</span>`;
+    list.appendChild(row);
+  });
+}
+
+async function createBogus() {
+  const input = document.getElementById('bogus-input');
+  const name = input.value.trim();
+  if (!name) return;
+  const res = await fetch(`/api/bogus?name=${encodeURIComponent(name)}`, { method: 'POST' });
+  if (res.ok) { input.value = ''; loadBogus(); }
+}
+
+async function deleteBogus(name) {
+  await fetch(`/api/bogus/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  loadBogus();
+}
+
+async function applyBogus() {
+  const status = document.getElementById('apply-status');
+  status.textContent = 'applying...';
+  status.style.color = 'var(--muted)';
+  try {
+    const res = await fetch('/api/bogus/apply', { method: 'POST' }).then(r => r.json());
+    status.textContent = `done — ${res.removed} tag links removed`;
+    status.style.color = '#4ec97a';
+    loadBogus();
+  } catch(e) {
+    status.textContent = 'error';
+    status.style.color = 'var(--pink)';
+  }
+}
+
+loadBogus();
+</script>
+</body>
+</html>

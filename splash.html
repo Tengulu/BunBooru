@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bunbooru</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --pink: #ea005e;
+    --dark: #4e001f;
+    --light: #d5eafb;
+    --bg: #080814;
+    --surface: #0d0d20;
+    --border: rgba(234,0,94,0.2);
+    --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.07) 2px,
+      rgba(0,0,0,0.07) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+    position: relative;
+    z-index: 1;
+    padding: 40px 20px;
+  }
+
+  #logo {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.18;
+    color: var(--pink);
+    text-shadow:
+      0 0 10px #ea005e,
+      0 0 25px #ea005eaa,
+      0 0 50px #ea005e44;
+    white-space: pre;
+    letter-spacing: 0;
+    text-align: center;
+    animation: flicker 6s infinite;
+  }
+
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: 0.85; }
+    97% { opacity: 1; }
+    98% { opacity: 0.9; }
+    99% { opacity: 1; }
+  }
+
+  #nav {
+    display: flex;
+    gap: 40px;
+    align-items: center;
+  }
+
+  .nav-link {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: none;
+    letter-spacing: 1px;
+    position: relative;
+    padding-bottom: 3px;
+    transition: color 0.2s;
+  }
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: var(--pink);
+    transform: scaleX(0);
+    transition: transform 0.2s;
+    transform-origin: left;
+  }
+  .nav-link:hover { color: var(--pink); }
+  .nav-link:hover::after { transform: scaleX(1); }
+
+  #search-wrap {
+    display: flex;
+    gap: 0;
+    width: 500px;
+    max-width: 90vw;
+  }
+
+  #search-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: 4px 0 0 4px;
+    padding: 10px 16px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #search-input:focus { border-color: var(--pink); }
+  #search-ac {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+    z-index: 100;
+    text-align: left;
+  }
+  .splash-ac-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .splash-ac-item:hover, .splash-ac-item.selected { background: rgba(234,0,94,0.12); }
+  .splash-ac-cat { color: var(--muted); font-size: 11px; }
+  .cat-creator { color: #c261ff; }
+  .cat-character { color: #4e9aff; }
+  .cat-copyright { color: #ff9f43; }
+  .cat-meta { color: #888; }
+  #search-input::placeholder { color: var(--muted); }
+
+  #search-btn {
+    background: var(--pink);
+    color: white;
+    border: none;
+    border-radius: 0 4px 4px 0;
+    padding: 10px 22px;
+    font-family: var(--mono);
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: opacity 0.15s;
+  }
+  #search-btn:hover { opacity: 0.85; }
+
+  #counter-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .counters-row {
+    display: flex;
+    gap: 30px;
+    align-items: flex-end;
+  }
+
+  .counter-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .counter-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .counter-digits {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+  }
+
+  .digit-img {
+    width: 45px;
+    height: 100px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+
+  <div id="logo">▄▄▄▄· ▄• ▄▌ ▐ ▄     ▄▄▄▄·             ▄▄▄  ▄• ▄▌
+▐█ ▀█▪█▪██▌•█▌▐█    ▐█ ▀█▪▪     ▪     ▀▄ █·█▪██▌
+▐█▀▀█▄█▌▐█▌▐█▐▐▌    ▐█▀▀█▄ ▄█▀▄  ▄█▀▄ ▐▀▀▄ █▌▐█▌
+██▄▪▐█▐█▄█▌██▐█▌    ██▄▪▐█▐█▌.▐▌▐█▌.▐▌▐█•█▌▐█▄█▌
+·▀▀▀▀  ▀▀▀ ▀▀ █▪    ·▀▀▀▀  ▀█▄▀▪ ▀█▄▀▪.▀  ▀ ▀▀▀ </div>
+
+  <div id="nav">
+    <a class="nav-link" href="/browse">posts</a>
+    <a class="nav-link" href="/tagger">tagging</a>
+    <a class="nav-link" href="/scraper">scraper</a>
+    <a class="nav-link" href="https://bunnyvision.uk" target="_blank">bunnyvision</a>
+  </div>
+
+  <div id="search-wrap">
+    <div style="position:relative;flex:1;display:flex;">
+      <input id="search-input" type="text" placeholder="search tags..." spellcheck="false" style="flex:1" autocomplete="off" />
+      <div id="search-ac"></div>
+    </div>
+    <button id="search-btn" onclick="doSearch()">search</button>
+  </div>
+
+  <div id="counter-section">
+    <div class="counters-row">
+      <div class="counter-col">
+        <div class="counter-label">images</div>
+        <div class="counter-digits" id="digits-images"></div>
+      </div>
+      <div class="counter-col">
+        <div class="counter-label">videos</div>
+        <div class="counter-digits" id="digits-videos"></div>
+      </div>
+    </div>
+    <div class="counter-col">
+      <div class="counter-label">needs tagging</div>
+      <div class="counter-digits" id="digits-untagged"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const DIGIT_PATH = '/static/counter/';
+
+  function renderDigits(containerId, number) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    const digits = String(Math.max(0, number)).split('');
+    digits.forEach(d => {
+      const img = document.createElement('img');
+      img.src = `${DIGIT_PATH}${d}.gif`;
+      img.alt = d;
+      img.className = 'digit-img';
+      el.appendChild(img);
+    });
+  }
+
+  async function loadCounts() {
+    try {
+      const stats = await fetch('/stats').then(r => r.json());
+      renderDigits('digits-images', stats.images || 0);
+      renderDigits('digits-videos', stats.videos || 0);
+      renderDigits('digits-untagged', stats.untagged || 0);
+    } catch(e) {
+      renderDigits('digits-images', 0);
+      renderDigits('digits-videos', 0);
+      renderDigits('digits-untagged', 0);
+    }
+  }
+
+  function doSearch() {
+    const q = document.getElementById('search-input').value.trim();
+    window.location.href = q ? `/browse?tags=${encodeURIComponent(q)}` : '/browse';
+  }
+
+  // ── Autocomplete ───────────────────────────────────────────────────────────
+  let acItems = [], acIndex = -1;
+  const acDropdown = document.getElementById('search-ac');
+  const searchInput = document.getElementById('search-input');
+
+  function tagColor(cat) {
+    return { creator: 'cat-creator', character: 'cat-character', copyright: 'cat-copyright', meta: 'cat-meta' }[cat] || '';
+  }
+
+  function renderAC(items) {
+    acDropdown.innerHTML = '';
+    if (!items.length) { acDropdown.style.display = 'none'; return; }
+    items.forEach((item, i) => {
+      const el = document.createElement('div');
+      el.className = 'splash-ac-item' + (i === acIndex ? ' selected' : '');
+      el.innerHTML = `<span class="${tagColor(item.category)}">${item.name}</span><span class="splash-ac-cat">${item.category} · ${item.post_count}</span>`;
+      el.addEventListener('mousedown', e => { e.preventDefault(); selectAC(i); });
+      acDropdown.appendChild(el);
+    });
+    acDropdown.style.display = 'block';
+  }
+
+  function selectAC(i) {
+    if (!acItems[i]) return;
+    const full = searchInput.value;
+    const lastSpace = full.lastIndexOf(' ');
+    const prefix = lastSpace >= 0 ? full.slice(0, lastSpace + 1) : '';
+    const item = acItems[i];
+    let tag = item.name;
+    if (item.category === 'creator') tag = `cr:${item.name}`;
+    else if (item.category === 'character') tag = `ch:${item.name}`;
+    else if (item.category === 'copyright') tag = `co:${item.name}`;
+    else if (item.category === 'meta') tag = `m:${item.name}`;
+    searchInput.value = prefix + tag + ' ';
+    acDropdown.style.display = 'none';
+    acItems = []; acIndex = -1;
+    searchInput.focus();
+  }
+
+  searchInput.addEventListener('input', async () => {
+    const full = searchInput.value;
+    const lastSpace = full.lastIndexOf(' ');
+    const current = full.slice(lastSpace + 1).replace(/^-/, '').trim();
+    if (!current) { acDropdown.style.display = 'none'; return; }
+    const results = await fetch(`/tags?search=${encodeURIComponent(current)}&limit=10`).then(r => r.json()).catch(() => []);
+    acItems = results; acIndex = -1;
+    renderAC(results);
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#search-wrap')) acDropdown.style.display = 'none';
+  });
+
+
+function handleTagInputSpace(e, input) {
+  if (e.key !== ' ') return;
+  e.preventDefault();
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  const val = input.value;
+  // if character just before cursor is '_', replace it with space (tag delimiter)
+  if (start > 0 && val[start - 1] === '_') {
+    input.value = val.slice(0, start - 1) + ' ' + val.slice(end);
+    input.setSelectionRange(start, start);
+  } else {
+    // insert underscore
+    input.value = val.slice(0, start) + '_' + val.slice(end);
+    input.setSelectionRange(start + 1, start + 1);
+  }
+  input.dispatchEvent(new Event('input'));
+}
+
+  searchInput.addEventListener('keydown', e => {
+    handleTagInputSpace(e, searchInput);
+    if (e.key === 'ArrowDown') { e.preventDefault(); acIndex = Math.min(acIndex + 1, acItems.length - 1); renderAC(acItems); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); acIndex = Math.max(acIndex - 1, -1); renderAC(acItems); }
+    else if (e.key === 'Enter') {
+      if (acIndex >= 0 && acItems[acIndex]) { e.preventDefault(); selectAC(acIndex); }
+      else doSearch();
+    }
+    else if (e.key === 'Escape') { acDropdown.style.display = 'none'; }
+  });
+
+  loadCounts();
+</script>
+</body>
+</html>

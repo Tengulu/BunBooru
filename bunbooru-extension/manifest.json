@@ -1,0 +1,100 @@
+{
+  "manifest_version": 2,
+  "name": "Bunbooru Booru Assist",
+  "version": "1.0.0",
+  "description": "Send media from booru sites to bunbooru",
+  "icons": {
+    "48": "icons/bunny.svg"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "bunbooru-booru@local"
+    }
+  },
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>",
+    "storage"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://rule34.xxx/*"
+      ],
+      "js": [
+        "sites/rule34xxx.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://rule34.paheal.net/*"
+      ],
+      "js": [
+        "sites/paheal.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://twitter.com/*",
+        "*://x.com/*",
+        "*://*.x.com/*"
+      ],
+      "js": [
+        "twitter_inject_shim.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://twitter.com/*",
+        "*://x.com/*",
+        "*://*.x.com/*"
+      ],
+      "js": [
+        "sites/twitter.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://www.redgifs.com/*",
+        "*://redgifs.com/*"
+      ],
+      "js": [
+        "sites/redgifs.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    "inject.js",
+    "twitter_video_downloader.js",
+    "icons/*"
+  ]
+}

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bunbooru — tags</title>
+<style>
+  :root {
+    --pink: #ea005e; --bg: #080814; --surface: #0d0d20; --surface2: #13132a; --surface3: #1a1a35;
+    --border: rgba(234,0,94,0.2); --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb; --mono: 'Share Tech Mono', monospace; --sans: 'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+  #wrap { max-width: 800px; margin: 30px auto; padding: 0 24px; }
+
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  h2 { font-size: 15px; font-weight: 500; color: var(--pink); font-family: var(--mono); }
+  #tag-count { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+
+  .controls { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+  .controls input { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 7px 10px; color: var(--text); font-family: var(--mono); font-size: 12px; outline: none; flex: 1; min-width: 160px; }
+  .controls input:focus { border-color: var(--pink); }
+  .controls select { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 7px 10px; color: var(--text); font-family: var(--mono); font-size: 12px; outline: none; cursor: pointer; }
+  .controls select:focus { border-color: var(--pink); }
+
+  #tag-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  #tag-table th { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 400; cursor: pointer; user-select: none; }
+  #tag-table th:hover { color: var(--text); }
+  #tag-table td { padding: 6px 10px; border-bottom: 1px solid rgba(234,0,94,0.07); }
+  #tag-table tr:hover td { background: var(--surface); }
+
+  .tag-name { }
+  .cat-general { color: var(--text); }
+  .cat-creator { color: #c261ff; }
+  .cat-character { color: #4e9aff; }
+  .cat-copyright { color: #ff9f43; }
+  .cat-meta { color: #888; }
+
+  .cat-badge { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: var(--surface2); color: var(--muted); }
+
+  .del-btn { color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; }
+  .del-btn:hover { color: var(--pink); }
+
+  .count-cell { color: var(--muted); }
+
+  #loading { color: var(--muted); font-family: var(--mono); font-size: 12px; padding: 20px 0; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="topbar-mount"></div>
+<div id="wrap">
+  <div class="page-header">
+    <h2>tag list</h2>
+    <span id="tag-count"></span>
+  </div>
+
+  <div class="controls">
+    <input id="search-input" placeholder="search tags..." oninput="filterTags()" />
+    <select id="cat-filter" onchange="filterTags()">
+      <option value="">all categories</option>
+      <option value="general">general</option>
+      <option value="creator">creator</option>
+      <option value="character">character</option>
+      <option value="copyright">copyright</option>
+      <option value="meta">meta</option>
+    </select>
+    <select id="sort-select" onchange="filterTags()">
+      <option value="count">sort by count</option>
+      <option value="name">sort by name</option>
+    </select>
+  </div>
+
+  <div id="loading">loading...</div>
+  <table id="tag-table" style="display:none">
+    <thead>
+      <tr>
+        <th onclick="setSort('name')">name</th>
+        <th>category</th>
+        <th onclick="setSort('count')">posts</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tag-tbody"></tbody>
+  </table>
+</div>
+
+<script>
+let allTags = [];
+let currentSort = 'count';
+
+async function loadTags() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('tag-table').style.display = 'none';
+  allTags = await fetch('/api/tags/all').then(r => r.json()).catch(() => []);
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('tag-table').style.display = 'table';
+  renderTags(allTags);
+}
+
+function setSort(s) {
+  currentSort = s;
+  document.getElementById('sort-select').value = s;
+  filterTags();
+}
+
+function filterTags() {
+  const search = document.getElementById('search-input').value.trim().toLowerCase();
+  const cat = document.getElementById('cat-filter').value;
+  currentSort = document.getElementById('sort-select').value;
+
+  let filtered = allTags.filter(t => {
+    if (search && !t.name.includes(search)) return false;
+    if (cat && t.category !== cat) return false;
+    return true;
+  });
+
+  if (currentSort === 'name') {
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
+  } else {
+    filtered.sort((a, b) => b.post_count - a.post_count || a.name.localeCompare(b.name));
+  }
+
+  renderTags(filtered);
+}
+
+function renderTags(tags) {
+  const tbody = document.getElementById('tag-tbody');
+  tbody.innerHTML = '';
+  document.getElementById('tag-count').textContent = `${tags.length} tags`;
+
+  tags.forEach(tag => {
+    const tr = document.createElement('tr');
+    tr.dataset.name = tag.name;
+
+    const catClass = `cat-${tag.category}`;
+    tr.innerHTML = `
+      <td class="tag-name ${catClass}">${tag.name}</td>
+      <td><span class="cat-badge">${tag.category}</span></td>
+      <td class="count-cell">${tag.post_count}</td>
+      <td><span class="del-btn" title="delete tag">×</span></td>
+    `;
+
+    tr.querySelector('.del-btn').onclick = () => deleteTag(tag.name, tr);
+    tbody.appendChild(tr);
+  });
+}
+
+async function deleteTag(name, row) {
+  if (!confirm(`delete tag "${name}"? it will be removed from all posts.`)) return;
+  const res = await fetch(`/api/tags/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  if (res.ok) {
+    row.remove();
+    allTags = allTags.filter(t => t.name !== name);
+    document.getElementById('tag-count').textContent = `${document.getElementById('tag-tbody').rows.length} tags`;
+  } else {
+    alert('failed to delete tag');
+  }
+}
+
+// topbar
+fetch('/topbar').then(r => r.text()).then(html => {
+  document.getElementById('topbar-mount').innerHTML = html;
+  const m = html.match(/<script>([\s\S]*?)<\/script>/);
+  if (m) { const s = document.createElement('script'); s.textContent = m[1]; document.body.appendChild(s); }
+});
+
+loadTags();
+</script>
+</body>
+</html>

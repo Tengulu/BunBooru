@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bunbooru — browse</title>
+<style>
+  :root {
+    --pink: #ea005e;
+    --dark: #4e001f;
+    --light: #d5eafb;
+    --bg: #080814;
+    --surface: #0d0d20;
+    --surface2: #13132a;
+    --surface3: #1a1a35;
+    --border: rgba(234,0,94,0.2);
+    --border-hover: rgba(234,0,94,0.6);
+    --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --cat-general: #d5eafb;
+    --cat-creator: #c261ff;
+    --cat-character: #4e9aff;
+    --cat-copyright: #ff9f43;
+    --cat-meta: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+  a { color: inherit; text-decoration: none; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--dark); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--pink); }
+  #layout { display: flex; min-height: calc(100vh - 72px); }
+  #sidebar {
+    width: 170px; min-width: 170px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 14px 12px;
+    display: flex; flex-direction: column; gap: 18px;
+    position: sticky; top: 72px;
+    height: calc(100vh - 72px);
+    overflow-y: auto;
+  }
+  .sb-section { display: flex; flex-direction: column; gap: 7px; }
+  .sb-title { color: var(--pink); font-size: 10px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 1px; font-family: var(--mono); }
+  .toggle-btn { display: flex; align-items: center; justify-content: space-between; padding: 5px 9px; border-radius: 4px; border: 1px solid var(--pink); background: rgba(234,0,94,0.1); color: var(--pink); font-size: 12px; cursor: pointer; user-select: none; transition: all 0.15s; font-family: var(--mono); }
+  .toggle-btn:hover { background: rgba(234,0,94,0.18); }
+  .toggle-btn.off { border-color: rgba(213,234,251,0.12); background: transparent; color: var(--muted); }
+  .toggle-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--pink); transition: background 0.15s; flex-shrink: 0; }
+  .toggle-btn.off .toggle-dot { background: rgba(213,234,251,0.2); }
+  .tag-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 2px 0; cursor: pointer; color: var(--light); }
+  .tag-row:hover .tag-name { color: var(--pink); }
+  .tag-name { display: flex; align-items: center; gap: 5px; font-family: var(--mono); }
+  .tag-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .tag-dot.general { background: #888; }
+  .tag-dot.character { background: #4e9aff; }
+  .tag-dot.creator { background: #c261ff; }
+  .tag-dot.copyright { background: #ff9f43; }
+  .tag-dot.meta { background: var(--pink); }
+  .tag-ct { color: var(--muted); font-size: 10px; }
+  .stat-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); padding: 2px 0; }
+  .stat-val { color: var(--text); font-family: var(--mono); }
+  #main { flex: 1; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .pager-bar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); }
+  .pager-bar.full-width { justify-content: center; margin: 8px 0; }
+  .pager-bar.full-width .pager { width: 100%; display: flex; gap: 4px; }
+  .pager-bar.full-width .pager .page-btn { flex: 1; text-align: center; }
+  .pager { display: flex; gap: 4px; align-items: center; }
+  .page-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 3px; padding: 3px 8px; font-size: 11px; cursor: pointer; transition: all 0.15s; font-family: var(--mono); }
+  .page-btn:hover { border-color: var(--pink); color: var(--pink); }
+  .page-btn.active { background: var(--pink); border-color: var(--pink); color: white; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 7px; }
+  .post-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; aspect-ratio: 1; overflow: hidden; cursor: pointer; position: relative; transition: border-color 0.15s, transform 0.15s; text-decoration: none; display: block; }
+  .post-card:hover { border-color: var(--border-hover); transform: scale(1.02); z-index: 1; }
+  .post-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .post-card .vid-badge { position: absolute; top: 5px; right: 5px; background: var(--pink); color: white; font-size: 9px; font-family: var(--mono); padding: 1px 5px; border-radius: 2px; pointer-events: none; }
+  .post-card .untagged-badge { position: absolute; top: 5px; left: 5px; background: var(--dark); border: 1px solid var(--pink); color: var(--pink); font-size: 9px; font-family: var(--mono); padding: 1px 5px; border-radius: 2px; pointer-events: none; }
+  .thumb-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 24px; }
+  #loading { text-align: center; padding: 60px 0; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+  #empty { display: none; text-align: center; padding: 60px 0; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--pink); border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Select mode */
+  .post-card.selected { border-color: var(--pink) !important; transform: scale(1.02); }
+
+  .post-card .select-tick {
+    display: none;
+    position: absolute;
+    bottom: 5px; right: 5px;
+    width: 20px; height: 20px;
+    background: var(--pink);
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: white;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .post-card.selected .select-tick { display: flex; }
+  body.select-mode .post-card { cursor: pointer; }
+
+  /* Bulk action bar */
+  #bulk-bar {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 20px;
+    z-index: 100;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  #bulk-bar.visible { display: flex; }
+  #bulk-bar input[type=text] {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    max-width: 400px;
+  }
+  #bulk-bar input[type=text]:focus { border-color: var(--pink); }
+  #bulk-tag-ac {
+    position: absolute;
+    bottom: 100%;
+    left: 0; right: 0;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    max-height: 160px;
+    overflow-y: auto;
+    display: none;
+    z-index: 101;
+  }
+  #bulk-tag-wrap { position: relative; flex: 1; max-width: 400px; }
+  .bulk-ac-item { padding: 5px 10px; cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--text); display: flex; justify-content: space-between; }
+  .bulk-ac-item:hover, .bulk-ac-item.selected { background: rgba(234,0,94,0.12); }
+  .bulk-ac-cat { color: var(--muted); font-size: 10px; }
+  .bulk-btn {
+    background: var(--pink);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .bulk-btn.del { background: transparent; border: 1px solid var(--pink); color: var(--pink); }
+  .bulk-btn.del:hover { background: rgba(234,0,94,0.15); }
+  #bulk-count { color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="topbar-mount"></div>
+
+<div id="layout">
+  <div id="sidebar">
+    <div class="sb-section">
+      <div class="sb-title">filters</div>
+      <div class="toggle-btn" id="tog-drawn" onclick="toggleFilter('drawn')"><span>drawn</span><div class="toggle-dot"></div></div>
+      <div class="toggle-btn" id="tog-real" onclick="toggleFilter('real')"><span>real</span><div class="toggle-dot"></div></div>
+      <div class="toggle-btn" id="tog-shitpost" onclick="toggleFilter('shitpost')"><span>shitpost</span><div class="toggle-dot"></div></div>
+      <div class="toggle-btn" id="tog-untagged" onclick="toggleFilter('TAG_ME!')"><span>untagged</span><div class="toggle-dot"></div></div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-title">tags on page</div>
+      <div id="page-tags"><span style="color:var(--muted);font-size:11px">—</span></div>
+    </div>
+    <div class="sb-section">
+      <div id="select-mode-btn" onclick="toggleSelectMode()" class="toggle-btn off" style="cursor:pointer">
+        <span>Select Mode</span><div class="toggle-dot"></div>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-title">booru stats</div>
+      <div class="stat-row"><span>total posts</span><span class="stat-val" id="stat-total">—</span></div>
+      <div class="stat-row"><span>TAG_ME!</span><span class="stat-val" id="stat-untagged">—</span></div>
+      <div class="stat-row"><span>images</span><span class="stat-val" id="stat-images">—</span></div>
+      <div class="stat-row"><span>videos</span><span class="stat-val" id="stat-videos">—</span></div>
+      <div class="stat-row"><span>total tags</span><span class="stat-val" id="stat-tags">—</span></div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div class="pager-bar" id="pager-top">
+      <span id="count-label">loading...</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="select-all-btn" onclick="selectAll()" style="display:none;font-size:11px;font-family:var(--mono);color:var(--muted);cursor:pointer" onmouseover="this.style.color='var(--pink)'" onmouseout="this.style.color='var(--muted)'">select all</span>
+        <div class="pager" id="pager-top-btns"></div>
+      </div>
+    </div>
+    <div id="grid"></div>
+    <div id="loading"><div class="spinner"></div><br>loading posts...</div>
+    <div id="empty">no posts found</div>
+    <div class="pager-bar full-width" style="margin-top:8px">
+      <div class="pager" id="pager-bot-btns"></div>
+    </div>
+  </div>
+</div>
+
+<div id="bulk-bar">
+  <span id="bulk-count">0 selected</span>
+  <div id="bulk-tag-wrap">
+    <div id="bulk-tag-ac"></div>
+    <input type="text" id="bulk-tag-input" placeholder="tags to add (space separated)" autocomplete="off" />
+  </div>
+  <button class="bulk-btn" onclick="bulkTag()">add tags</button>
+  <button class="bulk-btn del" onclick="bulkDelete()">delete</button>
+  <button class="bulk-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted)" onclick="clearSelection()">clear</button>
+</div>
+
+<script>
+const API = '';
+let currentPage = 1;
+let currentSearch = '';
+let filterState = (() => {
+  try {
+    const saved = localStorage.getItem('bunbooru_filters');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return { drawn: true, real: true, shitpost: true, 'TAG_ME!': true };
+})();
+
+// ── Topbar ────────────────────────────────────────────────────────────────────
+fetch('/topbar').then(r => r.text()).then(html => {
+  document.getElementById('topbar-mount').innerHTML = html;
+  // run topbar scripts
+  document.querySelectorAll('#topbar-mount script').forEach(s => {
+    const ns = document.createElement('script');
+    ns.textContent = s.textContent;
+    document.body.appendChild(ns);
+  });
+});
+
+// ── URL state ─────────────────────────────────────────────────────────────────
+function readURL() {
+  const p = new URLSearchParams(window.location.search);
+  currentSearch = p.get('tags') || '';
+  currentPage = parseInt(p.get('page') || '1');
+}
+
+function pushURL() {
+  const p = new URLSearchParams();
+  if (currentSearch) p.set('tags', currentSearch);
+  if (currentPage > 1) p.set('page', String(currentPage));
+  const url = '/browse' + (p.toString() ? '?' + p.toString() : '');
+  history.pushState({ tags: currentSearch, page: currentPage }, '', url);
+}
+
+window.addEventListener('popstate', e => {
+  if (e.state) { currentSearch = e.state.tags || ''; currentPage = e.state.page || 1; }
+  else readURL();
+  const input = document.getElementById('search-input');
+  if (input) input.value = currentSearch;
+  loadPosts();
+});
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+function toggleFilter(name) {
+  filterState[name] = !filterState[name];
+  try { localStorage.setItem('bunbooru_filters', JSON.stringify(filterState)); } catch(e) {}
+  const elId = name === 'TAG_ME!' ? 'tog-untagged' : 'tog-' + name;
+  document.getElementById(elId).classList.toggle('off', !filterState[name]);
+  currentPage = 1;
+  loadPosts();
+}
+
+function buildQuery() {
+  let q = currentSearch.trim();
+  ['drawn', 'real'].forEach(f => {
+    if (!filterState[f]) q += (q ? ' ' : '') + '-' + f;
+  });
+  if (!filterState['shitpost']) q += (q ? ' ' : '') + '-shitpost';
+  if (!filterState['TAG_ME!']) q += (q ? ' ' : '') + '-TAG_ME!';
+  return q;
+}
+
+// ── Posts ─────────────────────────────────────────────────────────────────────
+async function loadPosts() {
+  document.getElementById('grid').innerHTML = '';
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('empty').style.display = 'none';
+
+  const q = buildQuery();
+  const url = `${API}/posts?tags=${encodeURIComponent(q)}&page=${currentPage}&limit=40`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    renderPosts(data.posts);
+    renderPagers(data.total, data.page, data.limit);
+    renderPageTags(data.posts);
+    loadStats();
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('empty').style.display = 'block';
+    document.getElementById('empty').textContent = 'error connecting to api';
+  }
+}
+
+function renderPosts(posts) {
+  document.getElementById('loading').style.display = 'none';
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  if (!posts.length) { document.getElementById('empty').style.display = 'block'; return; }
+
+  posts.forEach(post => {
+    const card = document.createElement('a');
+    card.className = 'post-card';
+    card.dataset.id = post.id;
+    const browseTag = currentSearch || '';
+    card.href = `/browse/${post.id}${browseTag ? '?tags=' + encodeURIComponent(browseTag) : ''}`;
+
+    // select mode click handler
+    card.addEventListener('click', e => {
+      if (selectMode) {
+        e.preventDefault();
+        toggleSelect(post.id, card);
+      }
+    });
+
+    // restore selected state after re-render
+    if (selectedIds.has(post.id)) card.classList.add('selected');
+
+    const isVideo = post.mime_type && post.mime_type.startsWith('video/');
+    const isGif = post.mime_type === 'image/gif' && post.tags.some(t => (typeof t === 'string' ? t : t.name) === 'animated');
+    const isAnimated = isVideo || isGif;
+    const isUntagged = post.tags.some(t => (typeof t === 'string' ? t : t.name) === 'TAG_ME!');
+
+    if (isAnimated) {
+      const badge = document.createElement('div');
+      badge.className = 'vid-badge';
+      if (isGif) badge.textContent = 'gif';
+      else badge.textContent = post.mime_type.split('/')[1] || 'video';
+      card.appendChild(badge);
+    }
+    if (isUntagged) {
+      const badge = document.createElement('div');
+      badge.className = 'untagged-badge';
+      badge.textContent = 'TAG_ME!';
+      card.appendChild(badge);
+    }
+
+    const img = document.createElement('img');
+    img.src = `${API}/thumbs/${post.hash}`;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.onerror = function() {
+      this.style.display = 'none';
+      const ph = document.createElement('div');
+      ph.className = 'thumb-placeholder';
+      ph.textContent = isVideo ? '▶' : '?';
+      card.insertBefore(ph, card.firstChild);
+    };
+    card.appendChild(img);
+
+    // select tick
+    const tick = document.createElement('div');
+    tick.className = 'select-tick';
+    tick.textContent = '✓';
+    card.appendChild(tick);
+    grid.appendChild(card);
+  });
+}
+
+function renderPageTags(posts) {
+  const tagCounts = {};
+  posts.forEach(p => p.tags.forEach(t => {
+    const name = typeof t === 'string' ? t : t.name;
+    if (name !== 'TAG_ME!') tagCounts[name] = (tagCounts[name] || 0) + 1;
+  }));
+  const sorted = Object.entries(tagCounts).sort((a,b) => b[1]-a[1]).slice(0, 12);
+  const container = document.getElementById('page-tags');
+  container.innerHTML = '';
+  if (!sorted.length) { container.innerHTML = '<span style="color:var(--muted);font-size:11px">—</span>'; return; }
+  sorted.forEach(([tag, count]) => {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.onclick = () => { currentSearch = tag; currentPage = 1; pushURL(); loadPosts(); const input = document.getElementById('search-input'); if (input) input.value = tag; };
+    row.innerHTML = `<span class="tag-name"><span class="tag-dot general"></span>${tag}</span><span class="tag-ct">${count}</span>`;
+    container.appendChild(row);
+  });
+}
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+function renderPagers(total, page, limit) {
+  const totalPages = Math.ceil(total / limit);
+  document.getElementById('count-label').textContent = total
+    ? `showing ${(page-1)*limit+1}–${Math.min(page*limit,total)} of ${total.toLocaleString()} posts`
+    : '0 posts';
+
+  ['pager-top-btns','pager-bot-btns'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    if (totalPages <= 1) return;
+
+    const addBtn = (label, p, disabled=false, active=false) => {
+      const btn = document.createElement('div');
+      btn.className = 'page-btn' + (active ? ' active' : '');
+      btn.textContent = label;
+      if (!disabled && !active) btn.onclick = () => { currentPage = p; pushURL(); loadPosts(); window.scrollTo(0,0); };
+      if (disabled) btn.style.pointerEvents = 'none';
+      el.appendChild(btn);
+    };
+
+    addBtn('‹', page-1, page===1);
+    getPageNums(page, totalPages).forEach(p => {
+      if (p === '…') { const d = document.createElement('div'); d.className='page-btn'; d.textContent='…'; d.style.pointerEvents='none'; el.appendChild(d); }
+      else addBtn(p, p, false, p===page);
+    });
+    addBtn('›', page+1, page===totalPages);
+  });
+}
+
+function getPageNums(current, total) {
+  if (total <= 21) return Array.from({length:total},(_,i)=>i+1);
+  const pages = [1];
+  if (current > 9) pages.push('…');
+  for (let i=Math.max(2,current-8); i<=Math.min(total-1,current+8); i++) pages.push(i);
+  if (current < total-8) pages.push('…');
+  pages.push(total);
+  return pages;
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const stats = await fetch(`${API}/stats`).then(r=>r.json());
+    document.getElementById('stat-total').textContent = stats.total.toLocaleString();
+    document.getElementById('stat-untagged').textContent = stats.untagged.toLocaleString();
+    document.getElementById('stat-images').textContent = stats.images.toLocaleString();
+    document.getElementById('stat-videos').textContent = stats.videos.toLocaleString();
+    document.getElementById('stat-tags').textContent = stats.tags.toLocaleString();
+  } catch(e) {}
+}
+
+// Override topbar search to update in-place on browse page
+function topbarSearch() {
+  const input = document.getElementById('search-input');
+  if (input) {
+    currentSearch = input.value.trim();
+    currentPage = 1;
+    pushURL();
+    loadPosts();
+  }
+}
+
+// ── Bulk tag autocomplete ────────────────────────────────────────────────────
+let bulkAcItems = [], bulkAcIndex = -1;
+
+document.addEventListener('DOMContentLoaded', () => {
+  // apply saved filter visual state
+  ['drawn','real','shitpost','TAG_ME!'].forEach(name => {
+    const elId = name === 'TAG_ME!' ? 'tog-untagged' : 'tog-' + name;
+    const el = document.getElementById(elId);
+    if (el) el.classList.toggle('off', !filterState[name]);
+  });
+
+  const input = document.getElementById('bulk-tag-input');
+  const dropdown = document.getElementById('bulk-tag-ac');
+  if (!input) return;
+
+  input.addEventListener('input', async () => {
+    const full = input.value;
+    const lastSpace = full.lastIndexOf(' ');
+    const current = full.slice(lastSpace + 1).trim();
+    if (!current) { dropdown.style.display = 'none'; return; }
+    const results = await fetch(`/tags?search=${encodeURIComponent(current)}&limit=10`).then(r => r.json()).catch(() => []);
+    bulkAcItems = results;
+    bulkAcIndex = -1;
+    renderBulkAC(results);
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); bulkAcIndex = Math.min(bulkAcIndex + 1, bulkAcItems.length - 1); renderBulkAC(bulkAcItems); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); bulkAcIndex = Math.max(bulkAcIndex - 1, -1); renderBulkAC(bulkAcItems); }
+    else if (e.key === 'Enter' && bulkAcIndex >= 0) { e.preventDefault(); selectBulkAC(bulkAcIndex); }
+    else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#bulk-tag-wrap')) dropdown.style.display = 'none';
+  });
+});
+
+function renderBulkAC(items) {
+  const dropdown = document.getElementById('bulk-tag-ac');
+  dropdown.innerHTML = '';
+  if (!items.length) { dropdown.style.display = 'none'; return; }
+  items.forEach((item, i) => {
+    const el = document.createElement('div');
+    el.className = 'bulk-ac-item' + (i === bulkAcIndex ? ' selected' : '');
+    el.innerHTML = `<span>${item.name}</span><span class="bulk-ac-cat">${item.category} · ${item.post_count}</span>`;
+    el.addEventListener('mousedown', e => { e.preventDefault(); selectBulkAC(i); });
+    dropdown.appendChild(el);
+  });
+  dropdown.style.display = 'block';
+}
+
+function selectBulkAC(i) {
+  const input = document.getElementById('bulk-tag-input');
+  const dropdown = document.getElementById('bulk-tag-ac');
+  if (!bulkAcItems[i]) return;
+  const full = input.value;
+  const lastSpace = full.lastIndexOf(' ');
+  const prefix = lastSpace >= 0 ? full.slice(0, lastSpace + 1) : '';
+  const item = bulkAcItems[i];
+  let tag = item.name;
+  if (item.category === 'creator') tag = `cr:${item.name}`;
+  else if (item.category === 'character') tag = `ch:${item.name}`;
+  else if (item.category === 'copyright') tag = `co:${item.name}`;
+  else if (item.category === 'meta') tag = `m:${item.name}`;
+  input.value = prefix + tag + ' ';
+  dropdown.style.display = 'none';
+  bulkAcItems = []; bulkAcIndex = -1;
+  input.focus();
+}
+
+// ── Select mode ──────────────────────────────────────────────────────────────
+let selectMode = false;
+let selectedIds = new Set();
+
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  document.body.classList.toggle('select-mode', selectMode);
+  document.getElementById('select-mode-btn').classList.toggle('off', !selectMode);
+  document.getElementById('select-all-btn').style.display = selectMode ? 'inline' : 'none';
+  if (!selectMode) clearSelection();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.post-card.selected').forEach(c => c.classList.remove('selected'));
+  updateBulkBar();
+}
+
+function toggleSelect(id, card) {
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+    card.classList.remove('selected');
+  } else {
+    selectedIds.add(id);
+    card.classList.add('selected');
+  }
+  updateBulkBar();
+}
+
+function selectAll() {
+  document.querySelectorAll('.post-card[data-id]').forEach(card => {
+    const id = parseInt(card.dataset.id);
+    selectedIds.add(id);
+    card.classList.add('selected');
+  });
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  const count = selectedIds.size;
+  document.getElementById('bulk-count').textContent = `${count} selected`;
+  bar.classList.toggle('visible', count > 0);
+}
+
+async function bulkTag() {
+  const tags = document.getElementById('bulk-tag-input').value.trim();
+  if (!tags || !selectedIds.size) return;
+  const ids = [...selectedIds];
+  let done = 0;
+  for (const id of ids) {
+    // fetch existing tags first, then add new ones
+    try {
+      const post = await fetch(`/posts/${id}`).then(r => r.json());
+      const existingTags = (post.tags || []).filter(t => t.name !== 'TAG_ME!').map(t => {
+        const n = t.name, c = t.category;
+        if (c === 'creator') return `cr:${n}`;
+        if (c === 'character') return `ch:${n}`;
+        if (c === 'copyright') return `co:${n}`;
+        if (c === 'meta') return `m:${n}`;
+        return n;
+      }).join(' ');
+      const combined = [existingTags, tags].filter(Boolean).join(' ');
+      await fetch(`/posts/${id}/tags?tags=${encodeURIComponent(combined)}`, { method: 'PUT' });
+      done++;
+    } catch(e) {}
+  }
+  document.getElementById('bulk-tag-input').value = '';
+  clearSelection();
+  loadPosts();
+  alert(`tagged ${done} posts`);
+}
+
+async function bulkDelete() {
+  if (!selectedIds.size) return;
+  if (!confirm(`delete ${selectedIds.size} post${selectedIds.size > 1 ? 's' : ''}? this cannot be undone.`)) return;
+  const ids = [...selectedIds];
+  let done = 0;
+  for (const id of ids) {
+    try {
+      await fetch(`/posts/${id}`, { method: 'DELETE' });
+      done++;
+    } catch(e) {}
+  }
+  clearSelection();
+  if (selectMode) toggleSelectMode();
+  loadPosts();
+}
+
+// ── Keyboard navigation ──────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  // don't fire if user is typing in search input
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight') {
+    const btns = document.querySelectorAll('#pager-top-btns .page-btn');
+    const lastBtn = btns[btns.length - 1];
+    if (lastBtn && lastBtn.textContent === '›' && lastBtn.style.pointerEvents !== 'none') lastBtn.click();
+  } else if (e.key === 'ArrowLeft') {
+    const btns = document.querySelectorAll('#pager-top-btns .page-btn');
+    const firstBtn = btns[0];
+    if (firstBtn && firstBtn.textContent === '‹' && firstBtn.style.pointerEvents !== 'none') firstBtn.click();
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+readURL();
+pushURL();
+loadPosts();
+</script>
+</body>
+</html>

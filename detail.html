@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bunbooru — post</title>
+<style>
+  :root {
+    --pink: #ea005e;
+    --dark: #4e001f;
+    --light: #d5eafb;
+    --bg: #080814;
+    --surface: #0d0d20;
+    --surface2: #13132a;
+    --surface3: #1a1a35;
+    --border: rgba(234,0,94,0.2);
+    --border-hover: rgba(234,0,94,0.6);
+    --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --cat-general: #d5eafb;
+    --cat-creator: #c261ff;
+    --cat-character: #4e9aff;
+    --cat-copyright: #ff9f43;
+    --cat-meta: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+  a { color: inherit; text-decoration: none; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--dark); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--pink); }
+  #detail-layout { display: flex; min-height: calc(100vh - 72px); }
+  #media-col { flex: 1; padding: 16px; display: flex; align-items: flex-start; justify-content: center; min-width: 0; overflow: auto; height: calc(100vh - 72px); position: sticky; top: 72px; }
+  #media-wrap { position: relative; cursor: zoom-in; max-width: 100%; }
+  #media-wrap.zoomed { cursor: zoom-out; display: inline-block; }
+  #post-img { display: block; max-width: 100%; max-height: calc(100vh - 110px); border-radius: 4px; border: 1px solid var(--border); transition: max-width 0.2s, max-height 0.2s; }
+  #post-img.zoomed { max-width: none; max-height: none; display: block; }
+  #post-video { display: none; max-width: 100%; max-height: calc(100vh - 110px); border-radius: 4px; border: 1px solid var(--border); }
+  #detail-sidebar { width: 260px; min-width: 260px; max-width: 260px; background: var(--surface); border-left: 1px solid var(--border); padding: 16px 14px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; overflow-x: hidden; max-height: calc(100vh - 72px); position: sticky; top: 72px; word-break: break-word; overflow-wrap: break-word; }
+  .detail-section { display: flex; flex-direction: column; gap: 8px; }
+  .detail-title { color: var(--pink); font-size: 10px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 5px; font-family: var(--mono); }
+  .detail-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .detail-tag { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 3px; border: 1px solid var(--border); color: var(--light); cursor: pointer; transition: all 0.15s; background: var(--surface2); text-decoration: none; display: inline-block; }
+  .detail-tag:hover { border-color: var(--pink); color: var(--pink); }
+  .detail-tag.general  { border-color: rgba(213,234,251,0.2); color: var(--light); }
+  .detail-tag.creator  { border-color: rgba(194,97,255,0.4); color: #d48fff; }
+  .detail-tag.character{ border-color: rgba(78,154,255,0.4); color: #7ab8ff; }
+  .detail-tag.copyright{ border-color: rgba(255,159,67,0.4); color: #ffbe76; }
+  .detail-tag.meta     { border-color: rgba(136,136,136,0.3); color: #888; }
+  .detail-stat { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); padding: 2px 0; gap: 8px; }
+  .detail-stat span:first-child { white-space: nowrap; flex-shrink: 0; }
+  .detail-stat span:last-child { color: var(--text); font-family: var(--mono); word-break: break-all; text-align: right; }
+  .action-link { display: block; text-align: center; padding: 7px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: 12px; font-family: var(--mono); cursor: pointer; transition: all 0.15s; text-decoration: none; }
+  .action-link:hover { border-color: var(--pink); color: var(--pink); }
+  #back-btn { font-family: var(--mono); font-size: 11px; color: var(--muted); cursor: pointer; transition: color 0.15s; text-decoration: none; display: inline-block; margin-bottom: 4px; }
+  #back-btn:hover { color: var(--pink); }
+</style>
+</head>
+<body>
+<div id="topbar-mount"></div>
+
+<div id="detail-layout">
+  <div id="media-col">
+    <div id="media-wrap" onclick="toggleZoom()">
+      <img id="post-img" src="" alt="" style="display:none" />
+      <video id="post-video" controls autoplay loop></video>
+    </div>
+  </div>
+
+  <div id="detail-sidebar">
+    <a id="back-btn" href="/browse">← back to browse</a>
+
+    <div class="detail-section">
+      <div class="detail-title">tags</div>
+      <div class="detail-tags" id="detail-tags"></div>
+      <a id="edit-tags-link" class="action-link" href="">✎ edit tags</a>
+      <a class="action-link" id="explore-btn" onclick="showInExplorer()" style="cursor:pointer">⎘ show in explorer</a>
+      <a class="action-link" onclick="deletePost()" style="cursor:pointer;color:#ff4466;">✕ delete post</a>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-title">info</div>
+      <div class="detail-stat"><span>post id</span><span id="d-id">—</span></div>
+      <div class="detail-stat"><span>file</span><span id="d-file">—</span></div>
+      <div class="detail-stat"><span>size</span><span id="d-size">—</span></div>
+      <div class="detail-stat"><span>dimensions</span><span id="d-dims">—</span></div>
+      <div class="detail-stat"><span>duration</span><span id="d-dur">—</span></div>
+      <div class="detail-stat"><span>source</span><span id="d-source">—</span></div>
+      <div class="detail-stat"><span>added</span><span id="d-added">—</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let isZoomed = false;
+
+// Browse context from URL
+const urlParams = new URLSearchParams(window.location.search);
+const browseTags = urlParams.get('tags') || '';
+
+// Adjacent post navigation
+let prevPostId = null;
+let nextPostId = null;
+
+async function loadAdjacentPosts() {
+  if (!browseTags && !postId) return;
+  // Fetch a page of results around current post to find neighbours
+  const tags = browseTags || '';
+  const data = await fetch(`${API}/posts?tags=${encodeURIComponent(tags)}&limit=1000`).then(r => r.json()).catch(() => ({ posts: [] }));
+  const ids = data.posts.sort((a, b) => b.id - a.id).map(p => p.id);
+  const idx = ids.indexOf(parseInt(postId));
+  prevPostId = idx > 0 ? ids[idx - 1] : null;
+  nextPostId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
+}
+
+function navigateToPost(id) {
+  if (!id) return;
+  const tagParam = browseTags ? `?tags=${encodeURIComponent(browseTags)}` : '';
+  window.location.href = `/browse/${id}${tagParam}`;
+}
+
+// ── Topbar ────────────────────────────────────────────────────────────────────
+fetch('/topbar').then(r => r.text()).then(html => {
+  document.getElementById('topbar-mount').innerHTML = html;
+  document.querySelectorAll('#topbar-mount script').forEach(s => {
+    const ns = document.createElement('script');
+    ns.textContent = s.textContent;
+    document.body.appendChild(ns);
+  });
+});
+
+// ── Load post ─────────────────────────────────────────────────────────────────
+const postId = window.location.pathname.split('/').pop();
+
+async function loadPost() {
+  const post = await fetch(`${API}/posts/${postId}`).then(r => r.json()).catch(() => null);
+  if (!post) { document.body.innerHTML += '<p style="padding:40px;color:var(--muted);font-family:var(--mono)">post not found</p>'; return; }
+
+  document.title = `bunbooru — post #${post.id}`;
+
+  const isVideo = post.mime_type && post.mime_type.startsWith('video/');
+  const img = document.getElementById('post-img');
+  const vid = document.getElementById('post-video');
+  const wrap = document.getElementById('media-wrap');
+
+  if (isVideo) {
+    img.style.display = 'none';
+    vid.style.display = 'block';
+    vid.src = `${API}/files/${post.hash}`;
+    vid.addEventListener('volumechange', () => {}, { once: true });
+    vid.addEventListener('canplay', () => { vid.volume = 0.5; }, { once: true });
+    wrap.style.cursor = 'default';
+    wrap.onclick = null;
+  } else {
+    vid.style.display = 'none';
+    img.style.display = 'block';
+    img.src = `${API}/files/${post.hash}`;
+  }
+
+  // tags
+  const tagsEl = document.getElementById('detail-tags');
+  const tagList = Array.isArray(post.tags) ? post.tags : [];
+  tagList.forEach(t => {
+    const name = typeof t === 'string' ? t : t.name;
+    const cat = typeof t === 'string' ? 'general' : (t.category || 'general');
+    const span = document.createElement('a');
+    span.className = `detail-tag ${cat}`;
+    span.textContent = name;
+    span.href = `/browse?tags=${encodeURIComponent(name)}`;
+    tagsEl.appendChild(span);
+  });
+
+  const browseTagsParam = `&source=browse${browseTags ? '&tags=' + encodeURIComponent(browseTags) : ''}`;
+  document.getElementById('edit-tags-link').href = `/tagger?post_id=${post.id}${browseTagsParam}`;
+  // update back button to preserve browse filter
+  const backBtn = document.getElementById('back-btn');
+  backBtn.href = browseTags ? `/browse?tags=${encodeURIComponent(browseTags)}` : '/browse';
+
+  document.getElementById('d-id').textContent = post.id;
+  document.getElementById('d-file').textContent = post.filename || '—';
+  document.getElementById('d-size').textContent = post.file_size ? formatBytes(post.file_size) : '—';
+  document.getElementById('d-dims').textContent = post.width && post.height ? `${post.width}×${post.height}` : '—';
+  document.getElementById('d-dur').textContent = post.duration ? formatDuration(post.duration) : '—';
+  document.getElementById('d-source').textContent = (post.source_site && post.source_site !== 'inbox') ? post.source_site : (post.source_url || post.source_site || '—');
+  document.getElementById('d-added').textContent = post.created_at ? new Date(post.created_at).toLocaleDateString() : '—';
+}
+
+// ── Middle-click pan ─────────────────────────────────────────────────────────
+(function() {
+  const col = document.getElementById('media-col');
+  let panning = false, startX, startY, scrollX, scrollY;
+
+  col.addEventListener('pointerdown', e => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    panning = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    scrollX = col.scrollLeft;
+    scrollY = col.scrollTop;
+    col.setPointerCapture(e.pointerId);
+    col.style.cursor = 'grabbing';
+  });
+
+  col.addEventListener('pointermove', e => {
+    if (!panning) return;
+    e.preventDefault();
+    col.scrollLeft = scrollX - (e.clientX - startX);
+    col.scrollTop  = scrollY - (e.clientY - startY);
+  });
+
+  col.addEventListener('pointerup', e => {
+    if (!panning) return;
+    panning = false;
+    col.style.cursor = '';
+  });
+
+  col.addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
+})();
+
+function toggleZoom() {
+  isZoomed = !isZoomed;
+  const img = document.getElementById('post-img');
+  const wrap = document.getElementById('media-wrap');
+  img.classList.toggle('zoomed', isZoomed);
+  wrap.classList.toggle('zoomed', isZoomed);
+}
+
+async function showInExplorer() {
+  const btn = document.getElementById('explore-btn');
+  try {
+    const res = await fetch(`${API}/posts/${postId}/filepath`).then(r => r.json());
+    const encoded = encodeURIComponent(res.path);
+    window.location.href = `bunbooru://open?path=${encoded}`;
+    btn.textContent = '✓ opening...';
+    setTimeout(() => btn.textContent = '⎘ show in explorer', 2000);
+  } catch(e) {
+    btn.textContent = 'error — is handler registered?';
+    setTimeout(() => btn.textContent = '⎘ show in explorer', 3000);
+  }
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b/1048576).toFixed(1) + ' MB';
+  return (b/1073741824).toFixed(2) + ' GB';
+}
+
+function formatDuration(s) {
+  const m = Math.floor(s/60), sec = s%60;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+async function deletePost() {
+  if (!confirm('delete this post? this cannot be undone.')) return;
+  const res = await fetch(`${API}/posts/${postId}`, { method: 'DELETE' });
+  if (res.ok) {
+    window.location.href = '/browse';
+  } else {
+    alert('delete failed');
+  }
+}
+
+loadPost();
+loadAdjacentPosts();
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight' && nextPostId) navigateToPost(nextPostId);
+  if (e.key === 'ArrowLeft' && prevPostId) navigateToPost(prevPostId);
+});
+</script>
+</body>
+</html>

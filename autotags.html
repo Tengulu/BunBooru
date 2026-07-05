@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bunbooru — autotags</title>
+<style>
+  :root {
+    --pink: #ea005e; --dark: #4e001f; --light: #d5eafb;
+    --bg: #080814; --surface: #0d0d20; --surface2: #13132a; --surface3: #1a1a35;
+    --border: rgba(234,0,94,0.2); --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb; --mono: 'Share Tech Mono', monospace; --sans: 'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+  #wrap { max-width: 700px; margin: 30px auto; padding: 0 24px; }
+  h2 { font-size: 15px; font-weight: 500; margin-bottom: 16px; color: var(--pink); font-family: var(--mono); }
+
+  /* add form */
+  .add-form { display: flex; gap: 8px; margin-bottom: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .add-form .ac-wrap { flex: 1; min-width: 150px; }
+  .add-form button { background: var(--pink); color: white; border: none; border-radius: 4px; padding: 7px 14px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .arrow { color: var(--pink); font-family: var(--mono); padding-top: 8px; }
+
+  /* autocomplete */
+  .ac-wrap { position: relative; }
+  .ac-wrap input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 7px 10px; color: var(--text); font-family: var(--mono); font-size: 12px; outline: none; }
+  .ac-wrap input:focus { border-color: var(--pink); }
+  .ac-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface3); border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px; max-height: 160px; overflow-y: auto; z-index: 100; display: none; }
+  .ac-item { padding: 5px 10px; cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--text); display: flex; justify-content: space-between; }
+  .ac-item:hover, .ac-item.selected { background: rgba(234,0,94,0.12); }
+  .ac-item .ac-cat { color: var(--muted); font-size: 10px; }
+
+  /* rule list */
+  #rule-list { display: flex; flex-direction: column; gap: 8px; }
+  .rule-row { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-family: var(--mono); font-size: 12px; }
+  .rule-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .rule-creator { color: #c261ff; font-size: 13px; }
+  .rule-arrow { color: var(--pink); }
+  .rule-actions { display: flex; gap: 8px; align-items: center; }
+  .rule-apply-btn { color: var(--muted); cursor: pointer; font-size: 11px; border: 1px solid var(--border); border-radius: 3px; padding: 2px 8px; }
+  .rule-apply-btn:hover { color: var(--text); border-color: var(--muted); }
+  .rule-del { color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
+  .rule-del:hover { color: var(--pink); }
+
+  /* tags display */
+  .rule-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; align-items: center; }
+  .tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 3px; font-size: 11px; background: var(--surface2); border: 1px solid var(--border); }
+  .tag-chip .chip-x { color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; }
+  .tag-chip .chip-x:hover { color: var(--pink); }
+  .cat-general { color: var(--text); }
+  .cat-creator { color: #c261ff; }
+  .cat-character { color: #4e9aff; }
+  .cat-copyright { color: #ff9f43; }
+  .cat-meta { color: #888; }
+
+  /* add tag inline */
+  .add-tag-wrap { position: relative; display: inline-flex; align-items: center; }
+  .add-tag-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 2px 7px; color: var(--text); font-family: var(--mono); font-size: 11px; outline: none; width: 120px; }
+  .add-tag-input:focus { border-color: var(--pink); }
+  .add-tag-dropdown { position: absolute; top: 100%; left: 0; min-width: 180px; background: var(--surface3); border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px; max-height: 140px; overflow-y: auto; z-index: 100; display: none; }
+  .plus-btn { color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; }
+  .plus-btn:hover { color: var(--pink); }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="topbar-mount"></div>
+<div id="wrap">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <h2 style="margin-bottom:0">creator autotags</h2>
+    <button id="reapply-all-btn" onclick="reapplyAll()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:5px 12px;font-size:11px;font-family:var(--mono);cursor:pointer">re-apply all</button>
+  </div>
+
+  <div class="add-form">
+    <div class="ac-wrap" id="creator-wrap">
+      <input id="creator-input" placeholder="creator tag" autocomplete="off" />
+      <div class="ac-dropdown" id="creator-ac"></div>
+    </div>
+    <span class="arrow">→</span>
+    <div class="ac-wrap" id="newtags-wrap">
+      <input id="newtags-input" placeholder="tags to auto-apply (space separated)" autocomplete="off" />
+      <div class="ac-dropdown" id="newtags-ac"></div>
+    </div>
+    <button onclick="addRule()">add rule</button>
+  </div>
+
+  <div id="rule-list"></div>
+</div>
+
+<script>
+const API = '';
+let rules = [];
+let existingCreators = new Set();
+
+// ── Tag color helper ───────────────────────────────────────────────────────
+function tagColor(category) {
+  return { creator: 'cat-creator', character: 'cat-character', copyright: 'cat-copyright', meta: 'cat-meta', general: 'cat-general' }[category] || 'cat-general';
+}
+
+function parseTagStr(str) {
+  if (str.startsWith('cr:')) return { name: str.slice(3), category: 'creator', full: str };
+  if (str.startsWith('ch:')) return { name: str.slice(3), category: 'character', full: str };
+  if (str.startsWith('co:')) return { name: str.slice(3), category: 'copyright', full: str };
+  if (str.startsWith('m:')) return { name: str.slice(2), category: 'meta', full: str };
+  return { name: str, category: 'general', full: str };
+}
+
+// ── Load & render ──────────────────────────────────────────────────────────
+async function loadRules() {
+  rules = await fetch('/api/autotags').then(r => r.json()).catch(() => []);
+  existingCreators = new Set(rules.map(r => r.creator));
+  renderRules();
+}
+
+function renderRules() {
+  const list = document.getElementById('rule-list');
+  list.innerHTML = '';
+  if (!rules.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:12px">no rules yet</div>';
+    return;
+  }
+  rules.forEach(rule => list.appendChild(buildRuleRow(rule)));
+}
+
+function buildRuleRow(rule) {
+  const row = document.createElement('div');
+  row.className = 'rule-row';
+  row.dataset.id = rule.id;
+
+  // header
+  const header = document.createElement('div');
+  header.className = 'rule-header';
+
+  const left = document.createElement('div');
+  left.style.cssText = 'display:flex;align-items:center;gap:8px;';
+  left.innerHTML = `<span class="rule-creator">cr:${rule.creator}</span><span class="rule-arrow">→</span>`;
+
+  const actions = document.createElement('div');
+  actions.className = 'rule-actions';
+
+  const applyBtn = document.createElement('span');
+  applyBtn.className = 'rule-apply-btn';
+  applyBtn.textContent = 're-apply';
+  applyBtn.onclick = () => applyRule(rule.id, applyBtn);
+
+  const delBtn = document.createElement('span');
+  delBtn.className = 'rule-del';
+  delBtn.textContent = '×';
+  delBtn.onclick = () => deleteRule(rule.id);
+
+  actions.appendChild(applyBtn);
+  actions.appendChild(delBtn);
+  header.appendChild(left);
+  header.appendChild(actions);
+  row.appendChild(header);
+
+  // tags
+  const tagsDiv = document.createElement('div');
+  tagsDiv.className = 'rule-tags';
+  tagsDiv.dataset.ruleId = rule.id;
+  renderTagChips(tagsDiv, rule);
+
+  // plus button to add tags
+  const plusBtn = document.createElement('span');
+  plusBtn.className = 'plus-btn';
+  plusBtn.textContent = '+';
+  plusBtn.onclick = () => showAddTagInput(tagsDiv, rule, plusBtn);
+  tagsDiv.appendChild(plusBtn);
+
+  row.appendChild(tagsDiv);
+  return row;
+}
+
+function renderTagChips(container, rule) {
+  // remove existing chips (keep plus btn)
+  [...container.querySelectorAll('.tag-chip')].forEach(c => c.remove());
+  const plusBtn = container.querySelector('.plus-btn, .add-tag-wrap');
+
+  const tags = rule.tags ? rule.tags.split(' ').filter(Boolean) : [];
+  tags.forEach(tagStr => {
+    const parsed = parseTagStr(tagStr);
+    const chip = document.createElement('span');
+    chip.className = `tag-chip`;
+    chip.innerHTML = `<span class="${tagColor(parsed.category)}">${tagStr}</span><span class="chip-x" data-tag="${tagStr}">×</span>`;
+    chip.querySelector('.chip-x').onclick = () => removeTagFromRule(rule, tagStr, container);
+    container.insertBefore(chip, plusBtn);
+  });
+}
+
+// ── Tag operations ─────────────────────────────────────────────────────────
+async function removeTagFromRule(rule, tagStr, container) {
+  const tags = rule.tags.split(' ').filter(t => t && t !== tagStr);
+  if (!tags.length) {
+    if (!confirm('removing the last tag will delete this rule. continue?')) return;
+    await deleteRule(rule.id);
+    return;
+  }
+  const updated = await fetch(`/api/autotags/${rule.id}?tags=${encodeURIComponent(tags.join(' '))}`, { method: 'PUT' }).then(r => r.json());
+  rule.tags = updated.tags;
+  renderTagChips(container, rule);
+}
+
+function showAddTagInput(tagsDiv, rule, plusBtn) {
+  if (tagsDiv.querySelector('.add-tag-wrap')) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'add-tag-wrap';
+
+  const input = document.createElement('input');
+  input.className = 'add-tag-input';
+  input.placeholder = 'add tag';
+  input.autocomplete = 'off';
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'add-tag-dropdown';
+
+  wrap.appendChild(input);
+  wrap.appendChild(dropdown);
+  tagsDiv.insertBefore(wrap, plusBtn);
+  input.focus();
+
+  let acItems = [], acIndex = -1;
+
+  input.addEventListener('input', async () => {
+    const val = input.value.trim();
+    if (!val) { dropdown.style.display = 'none'; return; }
+    const results = await fetch(`/tags?search=${encodeURIComponent(val)}&limit=10`).then(r => r.json()).catch(() => []);
+    acItems = results; acIndex = -1;
+    renderDropdown(dropdown, results, acIndex, (item) => selectTag(item, rule, tagsDiv, wrap));
+  });
+
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); acIndex = Math.min(acIndex + 1, acItems.length - 1); renderDropdown(dropdown, acItems, acIndex, (item) => selectTag(item, rule, tagsDiv, wrap)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); acIndex = Math.max(acIndex - 1, -1); renderDropdown(dropdown, acItems, acIndex, (item) => selectTag(item, rule, tagsDiv, wrap)); }
+    else if (e.key === 'Enter') {
+      if (acIndex >= 0 && acItems[acIndex]) {
+        selectTag(acItems[acIndex], rule, tagsDiv, wrap);
+      } else {
+        const val = input.value.trim();
+        if (val) await addTagToRule(val, rule, tagsDiv, wrap);
+      }
+    }
+    else if (e.key === 'Escape') { wrap.remove(); }
+  });
+
+  input.addEventListener('blur', () => setTimeout(() => wrap.remove(), 200));
+}
+
+async function selectTag(item, rule, tagsDiv, wrap) {
+  let tagStr = item.name;
+  if (item.category === 'creator') tagStr = `cr:${item.name}`;
+  else if (item.category === 'character') tagStr = `ch:${item.name}`;
+  else if (item.category === 'copyright') tagStr = `co:${item.name}`;
+  else if (item.category === 'meta') tagStr = `m:${item.name}`;
+  await addTagToRule(tagStr, rule, tagsDiv, wrap);
+}
+
+async function addTagToRule(tagStr, rule, tagsDiv, wrap) {
+  const existing = rule.tags.split(' ').filter(Boolean);
+  if (existing.includes(tagStr)) { wrap.remove(); return; }
+  const newTags = [...existing, tagStr].join(' ');
+  const updated = await fetch(`/api/autotags/${rule.id}?tags=${encodeURIComponent(newTags)}`, { method: 'PUT' }).then(r => r.json());
+  rule.tags = updated.tags;
+  wrap.remove();
+  renderTagChips(tagsDiv, rule);
+}
+
+function renderDropdown(dropdown, items, selectedIndex, onSelect) {
+  dropdown.innerHTML = '';
+  if (!items.length) { dropdown.style.display = 'none'; return; }
+  items.forEach((item, i) => {
+    const el = document.createElement('div');
+    el.className = 'ac-item' + (i === selectedIndex ? ' selected' : '');
+    el.innerHTML = `<span class="${tagColor(item.category)}">${item.name}</span><span class="ac-cat">${item.category} · ${item.post_count}</span>`;
+    el.addEventListener('mousedown', e => { e.preventDefault(); onSelect(item); });
+    dropdown.appendChild(el);
+  });
+  dropdown.style.display = 'block';
+}
+
+// ── Rule operations ────────────────────────────────────────────────────────
+async function addRule() {
+  const creatorInput = document.getElementById('creator-input');
+  const tagsInput = document.getElementById('newtags-input');
+  let creator = creatorInput.value.trim();
+  const tags = tagsInput.value.trim();
+  if (!creator || !tags) return;
+  if (creator.startsWith('cr:')) creator = creator.slice(3);
+  const res = await fetch(`/api/autotags?creator=${encodeURIComponent(creator)}&tags=${encodeURIComponent(tags)}`, { method: 'POST' });
+  if (res.ok) {
+    creatorInput.value = '';
+    tagsInput.value = '';
+    await loadRules();
+  } else {
+    const err = await res.json();
+    alert(err.detail || 'failed');
+  }
+}
+
+async function deleteRule(id) {
+  if (!confirm('delete this autotag rule?')) return;
+  await fetch(`/api/autotags/${id}`, { method: 'DELETE' });
+  await loadRules();
+}
+
+async function reapplyAll() {
+  const btn = document.getElementById('reapply-all-btn');
+  btn.textContent = '...';
+  let total = 0;
+  for (const rule of rules) {
+    const res = await fetch(`/api/autotags/${rule.id}/apply`, { method: 'POST' }).then(r => r.json());
+    total += res.applied || 0;
+  }
+  btn.textContent = `✓ ${total} posts`;
+  setTimeout(() => btn.textContent = 're-apply all', 2500);
+}
+
+async function applyRule(id, btn) {
+  btn.textContent = '...';
+  const res = await fetch(`/api/autotags/${id}/apply`, { method: 'POST' }).then(r => r.json());
+  btn.textContent = `✓ ${res.applied}`;
+  setTimeout(() => btn.textContent = 're-apply', 2000);
+}
+
+// ── Add form autocomplete ──────────────────────────────────────────────────
+function setupCreatorAC() {
+  const input = document.getElementById('creator-input');
+  const dropdown = document.getElementById('creator-ac');
+  let acItems = [], acIndex = -1;
+
+  input.addEventListener('input', async () => {
+    const val = input.value.trim();
+    if (!val) { dropdown.style.display = 'none'; return; }
+    const results = await fetch(`/tags?search=${encodeURIComponent(val)}&limit=20`).then(r => r.json()).catch(() => []);
+    // filter to creator category only, exclude already-used creators
+    const filtered = results.filter(t => t.category === 'creator' && !existingCreators.has(t.name));
+    acItems = filtered; acIndex = -1;
+    renderDropdown(dropdown, filtered, acIndex, (item) => {
+      input.value = item.name;
+      dropdown.style.display = 'none';
+    });
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); acIndex = Math.min(acIndex + 1, acItems.length - 1); renderDropdown(dropdown, acItems, acIndex, (item) => { input.value = item.name; dropdown.style.display = 'none'; }); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); acIndex = Math.max(acIndex - 1, -1); renderDropdown(dropdown, acItems, acIndex, (item) => { input.value = item.name; dropdown.style.display = 'none'; }); }
+    else if (e.key === 'Enter' && acIndex >= 0 && acItems[acIndex]) { input.value = acItems[acIndex].name; dropdown.style.display = 'none'; }
+    else if (e.key === 'Escape') dropdown.style.display = 'none';
+  });
+
+  document.addEventListener('click', e => { if (!e.target.closest('#creator-wrap')) dropdown.style.display = 'none'; });
+}
+
+function setupNewTagsAC() {
+  const input = document.getElementById('newtags-input');
+  const dropdown = document.getElementById('newtags-ac');
+  let acItems = [], acIndex = -1;
+
+  input.addEventListener('input', async () => {
+    const full = input.value;
+    const lastSpace = full.lastIndexOf(' ');
+    const current = full.slice(lastSpace + 1).trim();
+    if (!current) { dropdown.style.display = 'none'; return; }
+    const results = await fetch(`/tags?search=${encodeURIComponent(current)}&limit=10`).then(r => r.json()).catch(() => []);
+    acItems = results; acIndex = -1;
+    renderDropdown(dropdown, results, acIndex, (item) => selectNewTag(item, input, dropdown));
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); acIndex = Math.min(acIndex + 1, acItems.length - 1); renderDropdown(dropdown, acItems, acIndex, (item) => selectNewTag(item, input, dropdown)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); acIndex = Math.max(acIndex - 1, -1); renderDropdown(dropdown, acItems, acIndex, (item) => selectNewTag(item, input, dropdown)); }
+    else if (e.key === 'Enter' && acIndex >= 0 && acItems[acIndex]) { e.preventDefault(); selectNewTag(acItems[acIndex], input, dropdown); }
+    else if (e.key === 'Escape') dropdown.style.display = 'none';
+  });
+
+  document.addEventListener('click', e => { if (!e.target.closest('#newtags-wrap')) dropdown.style.display = 'none'; });
+}
+
+function selectNewTag(item, input, dropdown) {
+  let tag = item.name;
+  if (item.category === 'creator') tag = `cr:${item.name}`;
+  else if (item.category === 'character') tag = `ch:${item.name}`;
+  else if (item.category === 'copyright') tag = `co:${item.name}`;
+  else if (item.category === 'meta') tag = `m:${item.name}`;
+  const full = input.value;
+  const lastSpace = full.lastIndexOf(' ');
+  const prefix = lastSpace >= 0 ? full.slice(0, lastSpace + 1) : '';
+  input.value = prefix + tag + ' ';
+  dropdown.style.display = 'none';
+  acItems = []; acIndex = -1;
+  input.focus();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+fetch('/topbar').then(r => r.text()).then(html => {
+  document.getElementById('topbar-mount').innerHTML = html;
+  const s = document.createElement('script');
+  s.textContent = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] || '';
+  document.body.appendChild(s);
+});
+
+setupCreatorAC();
+setupNewTagsAC();
+loadRules();
+
+document.getElementById('creator-input').addEventListener('keydown', e => { if (e.key === 'Enter') addRule(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Storage - never commit media files
+storage/originals/*
+storage/thumbs/*
+!storage/originals/.gitkeep
+!storage/thumbs/.gitkeep
+
+# Backups
+backups/auto/*
+backups/manual/*
+!backups/auto/.gitkeep
+!backups/manual/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+
+# Docker volumes
+postgres_data/

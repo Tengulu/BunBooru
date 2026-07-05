@@ -1,0 +1,287 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@300;400;500&display=swap');
+  :root {
+    --pink: #ea005e;
+    --dark: #4e001f;
+    --light: #d5eafb;
+    --bg: #080814;
+    --surface: #0d0d20;
+    --surface2: #13132a;
+    --surface3: #1a1a35;
+    --border: rgba(234,0,94,0.2);
+    --border-hover: rgba(234,0,94,0.6);
+    --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --cat-general: #d5eafb;
+    --cat-creator: #c261ff;
+    --cat-character: #4e9aff;
+    --cat-copyright: #ff9f43;
+    --cat-meta: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+  a { color: inherit; text-decoration: none; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--dark); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--pink); }
+  #topbar {
+    background: var(--dark);
+    border-bottom: 1px solid var(--pink);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  #logo {
+    font-family: var(--mono);
+    font-size: 5.8px;
+    line-height: 1.18;
+    color: var(--pink);
+    text-shadow: 0 0 10px #ea005e, 0 0 20px #ea005e88;
+    white-space: pre;
+    letter-spacing: 0;
+    flex-shrink: 0;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  #search-area { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  #search-row { display: flex; gap: 8px; align-items: center; }
+  #search-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 7px 12px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #search-input:focus { border-color: var(--pink); }
+  #search-input::placeholder { color: var(--muted); }
+  #search-btn {
+    background: var(--pink);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 7px 16px;
+    font-family: var(--sans);
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  #search-btn:hover { opacity: 0.85; }
+  #nav-links { display: flex; gap: 16px; font-size: 12px; align-items: center; width: 100%; }
+  .nav-deco { color: var(--pink); opacity: 0.6; font-size: 13px; user-select: none; }
+  .nav-spacer { flex: 1; }
+  .nav-kitty { color: var(--muted); font-size: 12px; font-family: var(--mono); user-select: none; }
+  .nav-link {
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.15s;
+    padding: 2px 0;
+    border-bottom: 1px solid transparent;
+    text-decoration: none;
+  }
+  .nav-link:hover, .nav-link.active { color: var(--pink); border-bottom-color: var(--pink); }
+  #search-ac {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #13132a;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 200;
+    display: none;
+  }
+  .search-ac-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .search-ac-item:hover, .search-ac-item.selected { background: rgba(234,0,94,0.12); }
+  .search-ac-item .ac-cat { color: var(--muted); font-size: 10px; }
+  #search-row { position: relative; }
+</style>
+
+<div id="topbar">
+  <a id="logo" href="/">▄▄▄▄· ▄• ▄▌ ▐ ▄     ▄▄▄▄·             ▄▄▄  ▄• ▄▌
+▐█ ▀█▪█▪██▌•█▌▐█    ▐█ ▀█▪▪     ▪     ▀▄ █·█▪██▌
+▐█▀▀█▄█▌▐█▌▐█▐▐▌    ▐█▀▀█▄ ▄█▀▄  ▄█▀▄ ▐▀▀▄ █▌▐█▌
+██▄▪▐█▐█▄█▌██▐█▌    ██▄▪▐█▐█▌.▐▌▐█▌.▐▌▐█•█▌▐█▄█▌
+·▀▀▀▀  ▀▀▀ ▀▀ █▪    ·▀▀▀▀  ▀█▄▀▪ ▀█▄▀▪.▀  ▀ ▀▀▀ </a>
+  <div id="search-area">
+    <div id="search-row">
+      <input id="search-input" type="text" placeholder="tag1 tag2 -excluded_tag" spellcheck="false" autocomplete="off" />
+      <div id="search-ac"></div>
+      <button id="search-btn" onclick="topbarSearch()">search</button>
+    </div>
+    <div id="nav-links">
+      <span class="nav-deco">༻</span>
+      <a class="nav-link" href="/browse" data-page="browse">posts</a>
+      <a class="nav-link" href="/tagger" data-page="tagger">tagging</a>
+      <a class="nav-link" href="/upload" data-page="upload">upload</a>
+      <a class="nav-link" href="/aliases" data-page="aliases">aliases</a>
+      <a class="nav-link" href="/autotags" data-page="autotags">autotags</a>
+      <a class="nav-link" href="/taglist" data-page="taglist">tags</a>
+      <a class="nav-link" href="https://bunnyvision.uk" target="_blank">bunnyvision</a>
+      <a class="nav-link" id="backup-nav-btn" onclick="doBackup(event)" href="#">backup</a>
+      <a class="nav-link" id="sync-tagme-btn" onclick="doSyncTagMe(event)" href="#">sync tags</a>
+      <span class="nav-deco">༺</span>
+      <span class="nav-spacer"></span>
+      <span class="nav-kitty">ᐢ..ᐢ</span>
+    </div>
+  </div>
+</div>
+
+<script>
+async function doSyncTagMe(e) {
+  e.preventDefault();
+  const btn = document.getElementById('sync-tagme-btn');
+  btn.textContent = 'syncing...';
+  try {
+    const res = await fetch('/api/sync-tagme', { method: 'POST' }).then(r => r.json());
+    btn.textContent = `✓ +${res.added} -${res.removed}`;
+  } catch(e) {
+    btn.textContent = '✗ failed';
+  }
+  setTimeout(() => btn.textContent = 'sync tags', 3000);
+}
+
+async function doBackup(e) {
+  e.preventDefault();
+  const btn = document.getElementById('backup-nav-btn');
+  btn.textContent = 'backing up...';
+  try {
+    const res = await fetch('/backup', { method: 'POST' });
+    if (!res.ok) throw new Error('failed');
+    btn.textContent = '✓ backup saved';
+  } catch(e) {
+    btn.textContent = '✗ failed';
+  }
+  setTimeout(() => btn.textContent = 'backup', 3000);
+}
+
+function topbarSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  window.location.href = q ? `/browse?tags=${encodeURIComponent(q)}` : '/browse';
+}
+
+function initTopbar() {
+  // highlight active nav link
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  document.querySelectorAll('.nav-link[data-page]').forEach(link => {
+    if (path.startsWith('/' + link.dataset.page)) link.classList.add('active');
+  });
+  // pre-fill search from URL
+  const params = new URLSearchParams(window.location.search);
+  const tags = params.get('tags');
+  if (tags) document.getElementById('search-input').value = tags;
+
+  // ── Search autocomplete ──────────────────────────────────────────────────
+  const input = document.getElementById('search-input');
+  const ac = document.getElementById('search-ac');
+  let acItems = [], acIndex = -1;
+
+
+function handleTagInputSpace(e, input) {
+  if (e.key !== ' ') return;
+  e.preventDefault();
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  const val = input.value;
+  if (start > 0 && val[start - 1] === '_') {
+    input.value = val.slice(0, start - 1) + ' ' + val.slice(end);
+    input.setSelectionRange(start, start);
+  } else {
+    input.value = val.slice(0, start) + '_' + val.slice(end);
+    input.setSelectionRange(start + 1, start + 1);
+  }
+  input.dispatchEvent(new Event('input'));
+}
+
+  input.addEventListener('keydown', e => {
+    handleTagInputSpace(e, input);
+    if (e.key === 'Enter') {
+      if (acIndex >= 0 && acItems[acIndex]) {
+        e.preventDefault();
+        selectAcItem(acIndex);
+      } else {
+        ac.style.display = 'none';
+        topbarSearch();
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acIndex = Math.min(acIndex + 1, acItems.length - 1);
+      renderAc();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acIndex = Math.max(acIndex - 1, -1);
+      renderAc();
+    } else if (e.key === 'Escape') {
+      ac.style.display = 'none';
+    }
+  });
+
+  input.addEventListener('input', async () => {
+    const val = input.value;
+    // get the last token being typed
+    const tokens = val.split(' ');
+    const last = tokens[tokens.length - 1].replace(/^-/, '');
+    if (!last) { ac.style.display = 'none'; return; }
+
+    const results = await fetch(`/tags?search=${encodeURIComponent(last)}&limit=10`)
+      .then(r => r.json()).catch(() => []);
+    acItems = results;
+    acIndex = -1;
+    renderAc();
+  });
+
+  function renderAc() {
+    ac.innerHTML = '';
+    if (!acItems.length) { ac.style.display = 'none'; return; }
+    acItems.forEach((item, i) => {
+      const el = document.createElement('div');
+      el.className = 'search-ac-item' + (i === acIndex ? ' selected' : '');
+      el.innerHTML = `<span>${item.name}</span><span class="ac-cat">${item.category} · ${item.post_count}</span>`;
+      el.addEventListener('mousedown', e => { e.preventDefault(); selectAcItem(i); });
+      ac.appendChild(el);
+    });
+    ac.style.display = 'block';
+  }
+
+  function selectAcItem(i) {
+    const item = acItems[i];
+    if (!item) return;
+    // replace last token with selected tag
+    const tokens = input.value.split(' ');
+    const isExclude = tokens[tokens.length - 1].startsWith('-');
+    tokens[tokens.length - 1] = (isExclude ? '-' : '') + item.name;
+    input.value = tokens.join(' ') + ' ';
+    ac.style.display = 'none';
+    acItems = []; acIndex = -1;
+    input.focus();
+  }
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#search-row')) ac.style.display = 'none';
+  });
+}
+initTopbar();
+</script>

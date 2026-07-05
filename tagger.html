@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bunbooru — tagger</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --pink: #ea005e;
+    --dark: #4e001f;
+    --light: #d5eafb;
+    --bg: #080814;
+    --surface: #0d0d20;
+    --surface2: #13132a;
+    --surface3: #1a1a35;
+    --border: rgba(234,0,94,0.2);
+    --border-hover: rgba(234,0,94,0.6);
+    --muted: rgba(213,234,251,0.45);
+    --text: #d5eafb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --cat-general: #d5eafb;
+    --cat-creator: #c261ff;
+    --cat-character: #4e9aff;
+    --cat-copyright: #ff9f43;
+    --cat-meta: #888;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--dark); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--pink); }
+
+
+
+  /* ── Main layout ── */
+  #layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Left panel (pending tags) ── */
+  #left-panel {
+    width: 200px;
+    min-width: 200px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 14px 12px;
+    gap: 8px;
+  }
+
+  #left-panel h3 {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--pink);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 5px;
+    flex-shrink: 0;
+  }
+
+  #left-chips {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .left-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+    border: 1px solid;
+    cursor: default;
+  }
+  .left-chip.general  { border-color: rgba(213,234,251,0.3); color: var(--cat-general); background: rgba(213,234,251,0.06); }
+  .left-chip.creator  { border-color: rgba(194,97,255,0.4);  color: var(--cat-creator);  background: rgba(194,97,255,0.08); }
+  .left-chip.character{ border-color: rgba(78,154,255,0.4);  color: var(--cat-character);background: rgba(78,154,255,0.08); }
+  .left-chip.copyright{ border-color: rgba(255,159,67,0.4);  color: var(--cat-copyright);background: rgba(255,159,67,0.08); }
+  .left-chip.meta     { border-color: rgba(136,136,136,0.3); color: var(--cat-meta);     background: rgba(136,136,136,0.06); }
+
+  .left-chip-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .left-chip-cat { font-size: 9px; color: var(--muted); margin-right: 4px; flex-shrink: 0; }
+  .left-chip-remove { color: inherit; opacity: 0.5; cursor: pointer; font-size: 13px; line-height: 1; flex-shrink: 0; }
+  .left-chip-remove:hover { opacity: 1; }
+
+  #left-empty {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  /* ── Media panel ── */
+  #media-panel {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow: hidden;
+    background: var(--bg);
+    position: relative;
+  }
+
+  #media-panel.zoomed { cursor: zoom-out; }
+  #media-panel:not(.zoomed) { cursor: zoom-in; }
+
+  #post-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    display: block;
+    transition: max-width 0.2s, max-height 0.2s;
+  }
+  #post-img.zoomed { max-width: none; max-height: none; }
+
+  #post-video {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    display: none;
+  }
+
+  #empty-state {
+    text-align: center;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  #empty-state p { margin-top: 8px; }
+
+  /* ── Right panel ── */
+  #right-panel {
+    width: 320px;
+    min-width: 320px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* tag input section — fixed at top */
+  #input-section {
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #input-section h3 {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--pink);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+
+
+  /* autocomplete input */
+  #autocomplete-wrap {
+    position: relative;
+  }
+
+  #tag-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 7px 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #tag-input:focus { border-color: var(--pink); }
+  #tag-input::placeholder { color: var(--muted); }
+
+  #autocomplete-list {
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 160px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+  }
+
+  .ac-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    transition: background 0.1s;
+  }
+  .ac-item:hover, .ac-item.selected { background: rgba(234,0,94,0.12); }
+  .ac-item .ac-name { color: var(--text); }
+  .ac-item .ac-cat  { font-size: 10px; color: var(--muted); }
+  .ac-item .ac-ct   { font-size: 10px; color: var(--muted); }
+
+  /* hint text */
+  #prefix-hint {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-top: 5px;
+    line-height: 1.6;
+  }
+  #prefix-hint span { color: var(--pink); }
+
+  /* action buttons */
+  #action-btns {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 7px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    text-align: center;
+    border: 1px solid;
+    transition: all 0.15s;
+  }
+  .btn-prev {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--muted);
+    transition: all 0.15s;
+  }
+  .btn-prev:hover { border-color: var(--muted); color: var(--text); }
+  .btn-next {
+    background: var(--pink);
+    border-color: var(--pink);
+    color: white;
+  }
+  .btn-next:hover { opacity: 0.85; }
+
+  /* scrollable area below input */
+  #scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* existing tags section */
+  #existing-section {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #existing-section h3 {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--pink);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .existing-tag-remove {
+    display: inline-block;
+    margin-left: 5px;
+    opacity: 0.4;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    transition: opacity 0.15s;
+  }
+  .existing-tag-remove:hover { opacity: 1; color: var(--pink); }
+  .existing-tag.marked-for-removal {
+    opacity: 0.4;
+    text-decoration: line-through;
+  }
+
+  #existing-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .existing-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .existing-tag:hover { opacity: 0.7; }
+  .existing-tag.general  { border-color: rgba(213,234,251,0.25); color: var(--cat-general); }
+  .existing-tag.creator  { border-color: rgba(194,97,255,0.35);  color: var(--cat-creator); }
+  .existing-tag.character{ border-color: rgba(78,154,255,0.35);  color: var(--cat-character); }
+  .existing-tag.copyright{ border-color: rgba(255,159,67,0.35);  color: var(--cat-copyright); }
+  .existing-tag.meta     { border-color: rgba(136,136,136,0.25); color: var(--cat-meta); }
+
+  /* post info */
+  #post-info {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 2px 0;
+    font-family: var(--mono);
+    gap: 8px;
+  }
+  .info-row span:first-child { white-space: nowrap; flex-shrink: 0; }
+  .info-row span:last-child { color: var(--text); word-break: break-all; text-align: right; }
+
+  /* tag browser */
+  #browser-section {
+    padding: 12px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  #browser-section h3 {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--pink);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+  }
+
+  #browser-search {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    outline: none;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+    transition: border-color 0.2s;
+  }
+  #browser-search:focus { border-color: var(--pink); }
+  #browser-search::placeholder { color: var(--muted); }
+
+  #browser-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    overflow-y: auto;
+    flex: 1;
+    align-content: flex-start;
+  }
+
+  .browser-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .browser-tag:hover { opacity: 0.7; }
+  .browser-tag.general  { border-color: rgba(213,234,251,0.2); color: var(--cat-general); }
+  .browser-tag.creator  { border-color: rgba(194,97,255,0.3);  color: var(--cat-creator); }
+  .browser-tag.character{ border-color: rgba(78,154,255,0.3);  color: var(--cat-character); }
+  .browser-tag.copyright{ border-color: rgba(255,159,67,0.3);  color: var(--cat-copyright); }
+  .browser-tag.pending   { border-color: rgba(234,0,94,0.5);   color: var(--pink); border-style: dashed; }
+</style>
+</head>
+<body>
+<div id="topbar-mount"></div>
+
+<div id="layout">
+  <!-- Left panel: pending tags -->
+  <div id="left-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><a href="/browse" style="font-family:var(--mono);font-size:10px;color:var(--muted);text-decoration:none" onmouseover="this.style.color='var(--pink)'" onmouseout="this.style.color='var(--muted)'">← browse</a><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">queue: <span id="queue-count">—</span></span></div>
+    <h3>pending tags</h3>
+    <div id="left-chips"><div id="left-empty">no tags yet</div></div>
+    <div id="removal-section" style="display:none">
+      <h3 style="margin-top:12px;color:var(--pink)">pending removal</h3>
+      <div id="removal-chips"></div>
+    </div>
+  </div>
+
+  <!-- Media -->
+  <div id="media-panel" onclick="toggleZoom()">
+    <div id="empty-state" style="display:none">
+      <div style="font-size:32px;margin-bottom:12px">✓</div>
+      <p>all posts tagged</p>
+      <p style="margin-top:8px"><a href="/browse" style="color:var(--pink)">back to browse</a></p>
+    </div>
+    <img id="post-img" src="" alt="" style="display:none" />
+    <video id="post-video" controls></video>
+  </div>
+
+  <!-- Right panel -->
+  <div id="right-panel">
+
+    <!-- Tag input — always at top -->
+    <div id="input-section">
+      <h3>add tags</h3>
+      <div id="autocomplete-wrap">
+        <input id="tag-input" type="text" placeholder="type a tag and press enter..." autocomplete="off" spellcheck="false" />
+        <div id="autocomplete-list"></div>
+      </div>
+      <div id="prefix-hint">
+        no prefix = general &nbsp;·&nbsp;
+        <span>cr:</span> creator &nbsp;·&nbsp;
+        <span>ch:</span> character &nbsp;·&nbsp;
+        <span>co:</span> copyright &nbsp;·&nbsp;
+        <span>m:</span> meta
+      </div>
+      <div id="action-btns">
+        <div class="btn btn-prev" onclick="prevPost()" id="btn-prev" style="opacity:0.3;pointer-events:none">← prev</div>
+        <div class="btn btn-next" onclick="nextPost()">next →</div>
+      </div>
+    </div>
+
+    <!-- Scrollable area -->
+    <div id="scroll-area">
+
+      <!-- Existing tags -->
+      <div id="existing-section">
+        <h3>existing tags</h3>
+        <div id="existing-tags"></div>
+      </div>
+
+      <!-- Post info -->
+      <div id="post-info">
+        <div class="info-row"><span>id</span><span id="info-id">—</span></div>
+        <div class="info-row"><span>file</span><span id="info-file">—</span></div>
+        <div class="info-row"><span>dimensions</span><span id="info-dims">—</span></div>
+        <div class="info-row"><span>size</span><span id="info-size">—</span></div>
+        <div class="info-row"><span>source</span><span id="info-source">—</span></div>
+      </div>
+
+      <!-- Tag browser -->
+      <div id="browser-section">
+        <h3>tag browser</h3>
+        <input id="browser-search" type="text" placeholder="filter tags..." autocomplete="off" spellcheck="false" />
+        <div id="browser-grid"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let currentPost = null;
+
+fetch('/topbar').then(r => r.text()).then(html => {
+  document.getElementById('topbar-mount').innerHTML = html;
+  document.querySelectorAll('#topbar-mount script').forEach(s => { const ns = document.createElement('script'); ns.textContent = s.textContent; document.body.appendChild(ns); });
+});
+let pendingTags = []; // [{name, category}]
+let pendingRemovals = []; // [{name, category}]
+let acItems = [];
+let acIndex = -1;
+let isZoomed = false;
+let allBrowserTags = [];
+
+const TAG_PREFIXES = {
+  'creator:': 'creator', 'cr:': 'creator',
+  'character:': 'character', 'ch:': 'character',
+  'copyright:': 'copyright', 'co:': 'copyright',
+  'meta:': 'meta',
+  'm:': 'meta',
+};
+
+const CAT_COLORS = {
+  general: 'var(--cat-general)',
+  creator: 'var(--cat-creator)',
+  character: 'var(--cat-character)',
+  copyright: 'var(--cat-copyright)',
+  meta: 'var(--cat-meta)',
+};
+
+function parseTagInput(raw) {
+  raw = raw.trim().toLowerCase().replace(/ /g, '_');
+  for (const [prefix, cat] of Object.entries(TAG_PREFIXES)) {
+    if (raw.startsWith(prefix)) {
+      return { name: raw.slice(prefix.length).replace(/^_+/, ''), category: cat };
+    }
+  }
+  return { name: raw, category: 'general' };
+}
+
+async function parseTagInputWithLookup(raw) {
+  const parsed = parseTagInput(raw);
+  // if no prefix was given, look up the existing category from the db
+  if (parsed.category === 'general') {
+    try {
+      const results = await fetch(`/tags?search=${encodeURIComponent(parsed.name)}&limit=20`).then(r => r.json());
+      const match = results.find(t => t.name === parsed.name);
+      if (match) parsed.category = match.category;
+    } catch(e) {
+      // if lookup fails, just use general
+    }
+  }
+  return parsed;
+}
+
+// ── Load post ──────────────────────────────────────────────────────────────
+
+async function loadNext() {
+  isZoomed = false;
+  pendingTags = [];
+  pendingRemovals = [];
+  renderChips();
+  renderRemovalChips();
+
+  if (!postQueue.length) {
+    showAllTagged();
+    return;
+  }
+
+  const post = await fetch(`${API}/posts/${postQueue[queueIndex]}`).then(r => r.json()).catch(() => null);
+
+  if (!post) {
+    showAllTagged();
+    return;
+  }
+  post.tags = (post.tags || []).map(t => typeof t === 'string' ? {name: t, category: 'general'} : t);
+
+  currentPost = post;
+  document.getElementById('empty-state').style.display = 'none';
+
+  const isVideo = post.mime_type && post.mime_type.startsWith('video/');
+  const img = document.getElementById('post-img');
+  const vid = document.getElementById('post-video');
+  const panel = document.getElementById('media-panel');
+
+  if (isVideo) {
+    img.style.display = 'none';
+    img.classList.remove('zoomed');
+    vid.style.display = 'block';
+    vid.src = `${API}/files/${post.hash}`;
+    panel.style.cursor = 'default';
+    panel.onclick = null;
+  } else {
+    vid.style.display = 'none';
+    vid.src = '';
+    img.style.display = 'block';
+    img.classList.remove('zoomed');
+    img.src = `${API}/files/${post.hash}`;
+    panel.style.cursor = 'zoom-in';
+    panel.onclick = toggleZoom;
+  }
+
+  // existing tags
+  renderExistingTags(post);
+
+  // info
+  document.getElementById('info-id').textContent = post.id;
+  document.getElementById('info-file').textContent = post.filename || '—';
+  document.getElementById('info-dims').textContent = post.width && post.height ? `${post.width}×${post.height}` : '—';
+  document.getElementById('info-source').textContent = (post.source_site && post.source_site !== 'inbox') ? post.source_site : (post.source_url || post.source_site || '—');
+
+  updateQueueCount();
+  document.getElementById('tag-input').focus();
+}
+
+async function loadSpecificPost(postId) {
+  const post = await fetch(`${API}/posts/${postId}`).then(r => r.json()).catch(() => null);
+  if (!post) return;
+  // reformat tags
+  post.tags = (post.tags || []).map(t => typeof t === 'string' ? {name: t, category: 'general'} : t);
+  currentPost = post;
+  pendingTags = [];
+  pendingRemovals = [];
+  renderChips();
+  renderRemovalChips();
+
+  document.getElementById('empty-state').style.display = 'none';
+  const isVideo = post.mime_type && post.mime_type.startsWith('video/');
+  const img = document.getElementById('post-img');
+  const vid = document.getElementById('post-video');
+
+  if (isVideo) {
+    img.style.display = 'none';
+    vid.style.display = 'block';
+    vid.src = `${API}/files/${post.hash}`;
+  } else {
+    vid.style.display = 'none';
+    img.style.display = 'block';
+    img.src = `${API}/files/${post.hash}`;
+  }
+
+  renderExistingTags(post);
+
+  document.getElementById('info-id').textContent = post.id;
+  document.getElementById('info-file').textContent = post.filename || '—';
+  document.getElementById('info-dims').textContent = post.width && post.height ? `${post.width}×${post.height}` : '—';
+  document.getElementById('info-source').textContent = (post.source_site && post.source_site !== 'inbox') ? post.source_site : (post.source_url || post.source_site || '—');
+  updateQueueCount();
+  document.getElementById('tag-input').focus();
+}
+
+function toggleZoom() {
+  if (!currentPost || currentPost.mime_type.startsWith('video/')) return;
+  isZoomed = !isZoomed;
+  const img = document.getElementById('post-img');
+  const panel = document.getElementById('media-panel');
+  img.classList.toggle('zoomed', isZoomed);
+  panel.style.cursor = isZoomed ? 'zoom-out' : 'zoom-in';
+}
+
+// ── Tag chips ──────────────────────────────────────────────────────────────
+
+function renderExistingTags(post) {
+  const existingEl = document.getElementById('existing-tags');
+  existingEl.innerHTML = '';
+  (post.tags || []).forEach(t => {
+    const cat = t.category || 'general';
+    const isMarked = pendingRemovals.some(r => r.name === t.name);
+    const el = document.createElement('span');
+    el.className = `existing-tag ${cat}${isMarked ? ' marked-for-removal' : ''}`;
+    el.dataset.tagName = t.name;
+    el.dataset.tagCat = cat;
+    const label = cat !== 'general' ? `${cat}:${t.name}` : t.name;
+    el.innerHTML = `${label}<span class="existing-tag-remove" title="remove tag">×</span>`;
+    el.querySelector('.existing-tag-remove').onclick = (e) => {
+      e.stopPropagation();
+      if (isMarked) {
+        unmarkForRemoval(t.name, cat);
+      } else {
+        markForRemoval(t.name, cat);
+      }
+    };
+    el.onclick = (event) => {
+      if (!el.querySelector('.existing-tag-remove').contains(event.target)) {
+        if (pendingRemovals.some(r => r.name === t.name)) {
+          unmarkForRemoval(t.name, cat);
+        } else {
+          markForRemoval(t.name, cat);
+        }
+      }
+    };
+    existingEl.appendChild(el);
+  });
+}
+
+function markForRemoval(name, category) {
+  if (pendingRemovals.find(r => r.name === name)) return;
+  pendingRemovals.push({ name, category });
+  renderRemovalChips();
+  // update the existing tag visually
+  const el = document.querySelector(`#existing-tags span[data-tag-name="${CSS.escape(name)}"]`);
+  if (el) el.classList.add('marked-for-removal');
+}
+
+function unmarkForRemoval(name, category) {
+  pendingRemovals = pendingRemovals.filter(r => r.name !== name);
+  renderRemovalChips();
+  const el = document.querySelector(`#existing-tags span[data-tag-name="${CSS.escape(name)}"]`);
+  if (el) el.classList.remove('marked-for-removal');
+}
+
+function renderRemovalChips() {
+  const section = document.getElementById('removal-section');
+  const container = document.getElementById('removal-chips');
+  container.innerHTML = '';
+  if (!pendingRemovals.length) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+  pendingRemovals.forEach(t => {
+    const chip = document.createElement('div');
+    chip.className = `left-chip ${t.category}`;
+    const catLabel = t.category !== 'general' ? `<span class="left-chip-cat">${t.category}</span>` : '';
+    chip.innerHTML = `${catLabel}<span class="left-chip-label">${t.name}</span><span class="left-chip-remove" onclick="unmarkForRemoval('${t.name}', '${t.category}')">×</span>`;
+    container.appendChild(chip);
+  });
+}
+
+function renderChips() {
+  const container = document.getElementById('left-chips');
+  container.innerHTML = '';
+  if (!pendingTags.length) {
+    container.innerHTML = '<div id="left-empty">no tags yet</div>';
+    return;
+  }
+  pendingTags.forEach((t, i) => {
+    const chip = document.createElement('div');
+    chip.className = `left-chip ${t.category}`;
+    const catLabel = t.category !== 'general' ? `<span class="left-chip-cat">${t.category}</span>` : '';
+    chip.innerHTML = `${catLabel}<span class="left-chip-label">${t.name}</span><span class="left-chip-remove" onclick="removeTag(${i})">×</span>`;
+    container.appendChild(chip);
+  });
+}
+
+function removeTag(index) {
+  pendingTags.splice(index, 1);
+  renderChips();
+}
+
+function addTag(name, category) {
+  name = name.trim().toLowerCase().replace(/ /g, '_');
+  if (!name) return;
+  if (pendingTags.find(t => t.name === name)) return;
+  pendingTags.push({ name, category: category || 'general' });
+  renderChips();
+  renderBrowserWithPending();
+}
+
+function renderBrowserWithPending() {
+  const grid = document.getElementById('browser-grid');
+  // remove existing pending tags first
+  grid.querySelectorAll('.browser-tag.pending').forEach(el => el.remove());
+  // remove pending header if exists
+  const existingPendingHeader = grid.querySelector('[data-pending-header]');
+  if (existingPendingHeader) existingPendingHeader.remove();
+
+  if (!pendingTags.length) return;
+
+  const existingNames = new Set([...grid.querySelectorAll('.browser-tag:not(.pending)')].map(el => el.dataset.name));
+  const newPending = pendingTags.filter(t => !existingNames.has(t.name));
+  if (!newPending.length) return;
+
+  // insert pending header at top
+  const header = document.createElement('div');
+  header.style.cssText = 'width:100%;font-family:var(--mono);font-size:9px;color:var(--pink);letter-spacing:1px;text-transform:uppercase;padding:6px 0 3px;border-bottom:1px solid var(--border);margin-bottom:3px;flex-basis:100%';
+  header.textContent = 'pending';
+  header.dataset.pendingHeader = '1';
+  grid.insertBefore(header, grid.firstChild);
+
+  // insert pending tags after header
+  let insertAfter = header;
+  newPending.forEach(t => {
+    const el = document.createElement('span');
+    el.className = 'browser-tag pending';
+    el.textContent = t.name;
+    el.dataset.name = t.name;
+    el.title = `${t.category} · pending`;
+    el.onclick = () => addTagFromBrowser(t.name, t.category);
+    insertAfter.after(el);
+    insertAfter = el;
+  });
+}
+
+function addTagFromBrowser(name, category) {
+  addTag(name, category);
+  document.getElementById('tag-input').focus();
+}
+
+// ── Autocomplete ───────────────────────────────────────────────────────────
+
+
+function handleTagInputSpace(e, input) {
+  if (e.key !== ' ') return;
+  e.preventDefault();
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  const val = input.value;
+  // if character just before cursor is '_', replace it with space (tag delimiter)
+  if (start > 0 && val[start - 1] === '_') {
+    input.value = val.slice(0, start - 1) + ' ' + val.slice(end);
+    input.setSelectionRange(start, start);
+  } else {
+    // insert underscore
+    input.value = val.slice(0, start) + '_' + val.slice(end);
+    input.setSelectionRange(start + 1, start + 1);
+  }
+  input.dispatchEvent(new Event('input'));
+}
+
+const tagInput = document.getElementById('tag-input');
+const acList = document.getElementById('autocomplete-list');
+
+tagInput.addEventListener('input', async () => {
+  const val = tagInput.value.trim();
+  if (!val) { hideAC(); return; }
+
+  // strip prefix for search
+  let searchTerm = val;
+  for (const prefix of Object.keys(TAG_PREFIXES)) {
+    if (val.startsWith(prefix)) { searchTerm = val.slice(prefix.length); break; }
+  }
+  if (!searchTerm) { hideAC(); return; }
+
+  const results = await fetch(`${API}/tags?search=${encodeURIComponent(searchTerm)}&limit=10`).then(r => r.json()).catch(() => []);
+  acItems = results;
+  acIndex = -1;
+  renderAC(results);
+});
+
+tagInput.addEventListener('keydown', e => {
+  handleTagInputSpace(e, tagInput);
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (acIndex >= 0 && acItems[acIndex]) {
+      selectAC(acIndex);
+    } else {
+      const val = tagInput.value.trim();
+      if (val) {
+        parseTagInputWithLookup(val).then(p => { if (p.name) addTag(p.name, p.category); });
+        tagInput.value = '';
+        hideAC();
+      }
+    }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acIndex = Math.min(acIndex + 1, acItems.length - 1);
+    renderAC(acItems);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acIndex = Math.max(acIndex - 1, -1);
+    renderAC(acItems);
+  } else if (e.key === 'Escape') {
+    hideAC();
+  }
+});
+
+function renderAC(items) {
+  acList.innerHTML = '';
+  if (!items.length) { hideAC(); return; }
+  items.forEach((item, i) => {
+    const el = document.createElement('div');
+    el.className = 'ac-item' + (i === acIndex ? ' selected' : '');
+    el.innerHTML = `<span class="ac-name">${item.name}</span><span class="ac-cat">${item.category}</span><span class="ac-ct">${item.post_count}</span>`;
+    el.addEventListener('mousedown', e => { e.preventDefault(); selectAC(i); });
+    acList.appendChild(el);
+  });
+  acList.style.display = 'block';
+}
+
+function selectAC(i) {
+  const item = acItems[i];
+  if (!item) return;
+  // preserve any typed prefix
+  const val = tagInput.value.trim();
+  let category = item.category;
+  for (const [prefix, cat] of Object.entries(TAG_PREFIXES)) {
+    if (val.startsWith(prefix)) { category = cat; break; }
+  }
+  addTag(item.name, category);
+  tagInput.value = '';
+  hideAC();
+}
+
+function hideAC() {
+  acList.style.display = 'none';
+  acItems = [];
+  acIndex = -1;
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#autocomplete-wrap')) hideAC();
+});
+
+// ── Actions ────────────────────────────────────────────────────────────────
+
+let postQueue = [];   // ordered list of TAG_ME! post IDs, oldest first
+let queueIndex = 0;   // current position in queue
+
+async function buildQueue() {
+  const data = await fetch(`${API}/posts?tags=${encodeURIComponent('TAG_ME!')}&limit=1000`).then(r => r.json()).catch(() => ({ posts: [] }));
+  postQueue = data.posts.sort((a, b) => a.id - b.id).map(p => p.id);
+  queueIndex = 0;
+}
+
+async function commitTags() {
+  if (!currentPost || (!pendingTags.length && !pendingRemovals.length)) return;
+  function formatTag(t) {
+    if (t.category === 'general') return t.name;
+    if (t.category === 'creator') return `cr:${t.name}`;
+    if (t.category === 'character') return `ch:${t.name}`;
+    if (t.category === 'copyright') return `co:${t.name}`;
+    if (t.category === 'meta') return `m:${t.name}`;
+    return t.name;
+  }
+  const removalNames = new Set(pendingRemovals.map(r => r.name));
+  // existing tags minus removals, never send TAG_ME!
+  const existingStr = (currentPost.tags || [])
+    .filter(t => t.name !== 'TAG_ME!' && !removalNames.has(t.name))
+    .map(formatTag).join(' ');
+  const pendingStr = pendingTags.filter(t => t.name !== 'TAG_ME!').map(formatTag).join(' ');
+  const tagStr = [existingStr, pendingStr].filter(Boolean).join(' ');
+  await fetch(`${API}/posts/${currentPost.id}/tags?tags=${encodeURIComponent(tagStr)}`, { method: 'PUT' });
+  loadBrowserTags(document.getElementById('browser-search').value.trim());
+}
+
+async function nextPost() {
+  if (!currentPost) return;
+  await commitTags();
+  queueIndex++;
+  if (queueIndex >= postQueue.length) {
+    showAllTagged();
+    return;
+  }
+  updatePrevBtn();
+  await loadSpecificPost(postQueue[queueIndex]);
+}
+
+async function prevPost() {
+  if (queueIndex <= 0) return;
+  await commitTags();
+  queueIndex--;
+  updatePrevBtn();
+  await loadSpecificPost(postQueue[queueIndex]);
+}
+
+function updatePrevBtn() {
+  const btn = document.getElementById('btn-prev');
+  if (!btn) return;
+  btn.style.opacity = queueIndex > 0 ? '1' : '0.3';
+  btn.style.pointerEvents = queueIndex > 0 ? 'auto' : 'none';
+}
+
+function showAllTagged() {
+  document.getElementById('empty-state').style.display = 'block';
+  document.getElementById('post-img').style.display = 'none';
+  document.getElementById('post-video').style.display = 'none';
+  currentPost = null;
+}
+
+// ── Tag browser ────────────────────────────────────────────────────────────
+
+async function loadBrowserTags(search = '') {
+  const tags = await fetch(`${API}/tags/browser?search=${encodeURIComponent(search)}&limit=500`).then(r => r.json()).catch(() => []);
+  allBrowserTags = tags;
+  renderBrowserGrid(tags);
+}
+
+function renderBrowserGrid(tags) {
+  const grid = document.getElementById('browser-grid');
+  grid.innerHTML = '';
+
+  // Group order: meta (manual) first, then creator, character, copyright, general
+  const order = ['meta', 'creator', 'character', 'copyright', 'general'];
+  const groups = {};
+  order.forEach(c => groups[c] = []);
+
+  tags.forEach(t => {
+    const cat = t.category || 'general';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(t);
+  });
+
+  order.forEach(cat => {
+    if (!groups[cat] || !groups[cat].length) return;
+
+    // Category header
+    const header = document.createElement('div');
+    header.style.cssText = 'width:100%;font-family:var(--mono);font-size:9px;color:var(--pink);letter-spacing:1px;text-transform:uppercase;padding:6px 0 3px;border-bottom:1px solid var(--border);margin-bottom:3px;flex-basis:100%';
+    header.textContent = cat;
+    grid.appendChild(header);
+
+    groups[cat].forEach(t => {
+      const el = document.createElement('span');
+      el.className = `browser-tag ${cat}`;
+      el.textContent = t.name;
+      el.dataset.name = t.name;
+      el.title = `${cat} · ${t.post_count} posts`;
+      el.onclick = () => addTagFromBrowser(t.name, cat);
+      grid.appendChild(el);
+    });
+  });
+}
+
+document.getElementById('browser-search').addEventListener('input', e => {
+  loadBrowserTags(e.target.value.trim());
+});
+
+// ── Queue count ────────────────────────────────────────────────────────────
+
+async function updateQueueCount() {
+  const stats = await fetch(`${API}/stats`).then(r => r.json()).catch(() => null);
+  if (stats) document.getElementById('queue-count').textContent = stats.untagged.toLocaleString();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+const params = new URLSearchParams(window.location.search);
+const specificId = params.get('post_id');
+const browseSource = params.get('source') === 'browse';
+const browseTags = params.get('tags') || '';
+
+async function buildBrowseQueue() {
+  const data = await fetch(`${API}/posts?tags=${encodeURIComponent(browseTags)}&limit=1000`).then(r => r.json()).catch(() => ({ posts: [] }));
+  postQueue = data.posts.sort((a, b) => b.id - a.id).map(p => p.id);
+  queueIndex = 0;
+  console.log('[tagger] browseSource:', browseSource, 'browseTags:', browseTags, 'queue length:', postQueue.length, 'first few:', postQueue.slice(0,5));
+}
+
+// build queue then load first post
+const queueBuilder = browseSource ? buildBrowseQueue() : buildQueue();
+queueBuilder.then(() => {
+  if (specificId) {
+    const idx = postQueue.indexOf(parseInt(specificId));
+    console.log('[tagger] specificId:', specificId, 'idx in queue:', idx, 'queueIndex set to:', idx >= 0 ? idx : 0);
+    if (idx >= 0) queueIndex = idx;
+    loadSpecificPost(parseInt(specificId));
+  } else {
+    loadNext();
+  }
+  updatePrevBtn();
+});
+loadBrowserTags();
+
+// keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight') nextPost();
+  if (e.key === 'ArrowLeft') prevPost();
+});
+</script>
+</body>
+</html>
